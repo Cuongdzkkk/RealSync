@@ -1,0 +1,58 @@
+name: .NET Backend CI
+
+# Tránh conflict khi nhiều commit cùng lúc
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# 1. Kích hoạt khi có thay đổi
+on:
+  push:
+    branches: 
+      - main
+      - develop
+      - feature/*
+  pull_request:
+    branches: 
+      - main
+      - develop
+
+jobs:
+  build-and-test:
+    # 2. Chạy trên Linux
+    runs-on: ubuntu-latest
+
+    steps:
+    # Bước 1: Checkout code
+    - name: Lấy mã nguồn (Checkout Code)
+      uses: actions/checkout@v4
+
+    # Bước 2: Setup .NET
+    - name: Cài đặt .NET Core
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    # Bước 3: Cache NuGet (tăng tốc build)
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    # Bước 4: Restore
+    - name: Khôi phục thư viện (Restore dependencies)
+      run: dotnet restore
+      working-directory: ./Backend
+
+    # Bước 5: Build
+    - name: Biên dịch dự án (Build)
+      run: dotnet build --no-restore --configuration Release
+      working-directory: ./Backend
+
+    # Bước 6: Test
+    - name: Chạy Unit Tests
+      run: dotnet test --no-build --verbosity normal --configuration Release
+      working-directory: ./Backend
