@@ -1,0 +1,117 @@
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Lấy danh sách bất động sản thành công",
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440001",
+      "propertyCode": "P-2026-0001",
+      "title": "Bán nhà mặt tiền đường Nguyễn Huệ, Quận 1, TP.HCM",
+      "description": "Nhà mặt tiền đẹp, vị trí đắc địa ngay trung tâm Quận 1. Kết cấu 3 tầng, diện tích 4x20m (80m²). Sổ hồng chính chủ, phù hợp kinh doanh mọi ngành nghề.",
+      "propertyType": {
+        "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "name": "Nhà mặt tiền",
+        "slug": "nha-mat-tien"
+      },
+      "project": null,
+      "area": {
+        "id": "f1e2d3c4-b5a6-7890-fedc-ba0987654321",
+        "province": "Hồ Chí Minh",
+        "district": "Quận 1",
+        "ward": "Phường Bến Nghé"
+      },
+      "address": "123 Nguyễn Huệ",
+      "latitude": 10.7731,
+      "longitude": 106.7030,
+      "areaSize": 80.00,
+      "price": 15000000000,
+      "priceUnit": "VND",
+      "priceFormatted": "15 tỷ",
+      "bedrooms": 4,
+      "bathrooms": 3,
+      "floors": 3,
+      "direction": "Đông Nam",
+      "legalStatus": "Sổ hồng",
+      "status": "Active",
+      "listingType": "Sale",
+      "featuredLevel": 1,
+      "sourceType": "Manual",
+      "slug": "ban-nha-mat-tien-nguyen-hue-quan-1-tp-hcm",
+      "images": [
+        {
+          "id": "img-001",
+          "url": "/uploads/properties/P-2026-0001/img1.jpg",
+          "thumbnailUrl": "/uploads/properties/P-2026-0001/img1_thumb.jpg",
+          "isPrimary": true,
+          "order": 1
+        },
+        {
+          "id": "img-002",
+          "url": "/uploads/properties/P-2026-0001/img2.jpg",
+          "thumbnailUrl": "/uploads/properties/P-2026-0001/img2_thumb.jpg",
+          "isPrimary": false,
+          "order": 2
+        }
+      ],
+      "tags": ["mặt tiền", "sổ hồng", "kinh doanh", "trung tâm"],
+      "qualityScore": 92,
+      "createdAt": "2026-05-10T08:30:00Z",
+      "updatedAt": "2026-05-12T14:15:00Z",
+      "createdBy": "admin@realsync.vn"
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440002",
+      "propertyCode": "P-2026-0002",
+      "title": "Bán đất nền dự án Vinhomes Grand Park, TP Thủ Đức",
+      "description": "Đất nền dự án Vinhomes Grand Park, pháp lý rõ ràng. Vị trí đẹp, gần trường học và siêu thị.",
+      "propertyType": {
+        "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+        "name": "Đất nền",
+        "slug": "dat-nen"
+      },
+      "project": {
+        "id": "c3d4e5f6-a7b8-9012-cdef-012345678901",
+        "name": "Vinhomes Grand Park",
+        "developer": "Vingroup"
+      },
+      "area": {
+        "id": "d4e5f6a7-b8c9-0123-defa-123456789012",
+        "province": "Hồ Chí Minh",
+        "district": "TP Thủ Đức",
+        "ward": "Phường Long Thạnh Mỹ"
+      },
+      "address": "Lô A-15, Vinhomes Grand Park",
+      "latitude": 10.8400,
+      "longitude": 106.8370,
+      "areaSize": 200.00,
+      "price": 4500000000,
+      "priceUnit": "VND",
+      "priceFormatted": "4.5 tỷ",
+      "bedrooms": 0,
+      "bathrooms": 0,
+      "floors": 0,
+      "direction": "Bắc",
+      "legalStatus": "Sổ đỏ",
+      "status": "Active",
+      "listingType": "Sale",
+      "featuredLevel": 0,
+      "sourceType": "Crawled",
+      "slug": "ban-dat-nen-vinhomes-grand-park-thu-duc",
+      "images": [],
+      "tags": ["đất nền", "dự án", "sổ đỏ"],
+      "qualityScore": 75,
+      "createdAt": "2026-05-11T10:00:00Z",
+      "updatedAt": null,
+      "createdBy": "crawler@realsync.vn"
+    }
+  ],
+  "errors": null,
+  "meta": {
+    "page": 1,
+    "pageSize": 20,
+    "totalCount": 2,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false
+  }
+}

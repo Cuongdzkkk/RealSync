@@ -1,0 +1,62 @@
+# docker-compose.yml — RealSync Development
+version: '3.8'
+
+services:
+  # ===== SQL Server =====
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: realsync-db
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${DB_PASSWORD:-RealSync@Dev2026!}
+      - MSSQL_PID=Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    networks:
+      - realsync-net
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$${MSSQL_SA_PASSWORD}" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ===== Redis Cache =====
+  redis:
+    image: redis:7-alpine
+    container_name: realsync-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - realsync-net
+    healthcheck:
+      test: redis-cli ping
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ===== Seq (Logging) - Optional =====
+  # seq:
+  #   image: datalust/seq:latest
+  #   container_name: realsync-seq
+  #   environment:
+  #     - ACCEPT_EULA=Y
+  #   ports:
+  #     - "5341:80"
+  #   volumes:
+  #     - seq-data:/data
+  #   networks:
+  #     - realsync-net
+
+volumes:
+  sqlserver-data:
+  redis-data:
+  # seq-data:
+
+networks:
+  realsync-net:
+    driver: bridge
