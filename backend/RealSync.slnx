@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RealSync.Api/RealSync.Api.csproj" />
+    <Project Path="src/RealSync.Core/RealSync.Core.csproj" />
+    <Project Path="src/RealSync.Data/RealSync.Data.csproj" />
+    <Project Path="src/RealSync.Services/RealSync.Services.csproj" />
+    <Project Path="src/RealSync.Shared/RealSync.Shared.csproj" />
+  </Folder>
+</Solution>
