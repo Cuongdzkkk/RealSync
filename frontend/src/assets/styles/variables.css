@@ -1,0 +1,75 @@
+:root {
+  /* ── SURFACES ──────────────────────────────────────────────── */
+  --color-canvas:         #FAFAFA;
+  --color-surface:        #FFFFFF;
+  --color-surface-hover:  #F5F5F5;
+
+  /* ── TEXT ───────────────────────────────────────────────────── */
+  --color-text-primary:   #0D0D0D;
+  --color-text-secondary: #6B6B6B;
+  --color-text-muted:     #ABABAB;
+
+  /* ── BORDERS ───────────────────────────────────────────────── */
+  --color-border:         #E8E8E8;
+  --color-border-strong:  #D0D0D0;
+  --color-divider:        #F0F0F0;
+
+  /* ── ACCENT — ELECTRIC YELLOW (ONE ONLY) ───────────────────── */
+  --color-yellow:         #F5E642;
+  --color-yellow-hover:   #EDD800;
+  --color-yellow-muted:   #FEFBCC;
+  --color-yellow-text:    #0D0D0D;
+
+  /* ── METRIC CARD BACKGROUNDS ───────────────────────────────── */
+  --color-pastel-pink:    #F0D0DC;
+  --color-pastel-blue:    #D4E8F0;
+  --color-pastel-green:   #D4EDD8;
+  --color-pastel-peach:   #F0E0D0;
+
+  /* ── SEMANTIC STATUS ───────────────────────────────────────── */
+  --color-success:        #16A34A;
+  --color-success-bg:     #F0FDF4;
+  --color-success-border: #BBF7D0;
+  --color-warning:        #D97706;
+  --color-warning-bg:     #FFFBEB;
+  --color-danger:         #DC2626;
+  --color-danger-bg:      #FEF2F2;
+  --color-info:           #2563EB;
+  --color-info-bg:        #EFF6FF;
+
+  /* ── AI MODULE (restricted) ────────────────────────────────── */
+  --color-ai:             #0891B2;
+  --color-ai-bg:          #ECFEFF;
+  --color-ai-border:      #A5F3FC;
+
+  /* ── TYPOGRAPHY ────────────────────────────────────────────── */
+  --font-ui:     'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-mono:   'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace;
+
+  /* ── ELEVATION ─────────────────────────────────────────────── */
+  --elevation-flat:    none;
+  --elevation-surface: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --elevation-raised:  0 2px 12px rgba(0, 0, 0, 0.06);
+  --elevation-floating: 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  /* ── MOTION ────────────────────────────────────────────────── */
+  --duration-fast:   120ms;
+  --duration-base:   200ms;
+  --duration-slow:   350ms;
+  --ease-spring:     cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-standard:   cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+
+  /* ── FOCUS ─────────────────────────────────────────────────── */
+  --ring-color:      rgba(245, 230, 66, 0.55);
+  --ring-offset:     2px;
+
+  /* ── Z-INDEX ───────────────────────────────────────────────── */
+  --z-base:    0;
+  --z-raised:  10;
+  --z-sidebar: 100;
+  --z-sticky:  200;
+  --z-overlay: 300;
+  --z-modal:   400;
+  --z-toast:   500;
+}
