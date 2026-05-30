@@ -48,6 +48,8 @@ secrets.json
 
 # ----- Frontend (Vue/Node) -----
 node_modules/
+.vite/
+.npm-cache/
 dist/
 .output/
 .nuxt/
