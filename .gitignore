@@ -93,3 +93,18 @@ TestResults/
 # ----- Build -----
 build/
 publish/
+
+# ----- RealSync AI Team (opencode agents & infra) -----
+.opencode/
+autopilot.py
+autopilot.bat
+inject.ps1
+mcp-server.py
+mcp-requirements.txt
+planner.bat
+coder.bat
+reviewer.bat
+start-team.bat
+data/
+TEAM.md
+AGENTS.md

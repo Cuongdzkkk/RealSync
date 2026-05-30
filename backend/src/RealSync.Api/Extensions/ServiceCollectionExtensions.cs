@@ -31,6 +31,10 @@ public static class ServiceCollectionExtensions
 
         // Services
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IActivityLogService, ActivityLogService>();
+        services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IDashboardService, DashboardService>();
+
 
         // FluentValidation — auto-scan tất cả validators từ Shared assembly
         services.AddValidatorsFromAssemblyContaining<RealSync.Shared.Validators.Auth.LoginRequestValidator>();

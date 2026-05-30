@@ -46,12 +46,36 @@ public class RealSyncDbContext : DbContext
     public DbSet<CrawlJob> CrawlJobs => Set<CrawlJob>();
     public DbSet<CrawlResult> CrawlResults => Set<CrawlResult>();
 
+    // Authorization
+    public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+
+    // CRM
+    public DbSet<Customer> Customers => Set<Customer>();
+
+    // System
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
         // Apply tất cả configurations từ assembly này
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(RealSyncDbContext).Assembly);
+
+        // Global query filter: tự động loại bỏ soft-deleted entities
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
+            {
+                var parameter = System.Linq.Expressions.Expression.Parameter(entityType.ClrType, "e");
+                var property = System.Linq.Expressions.Expression.Property(parameter, nameof(BaseEntity.IsDeleted));
+                var condition = System.Linq.Expressions.Expression.Equal(property, System.Linq.Expressions.Expression.Constant(false));
+                var lambda = System.Linq.Expressions.Expression.Lambda(condition, parameter);
+                modelBuilder.Entity(entityType.ClrType).HasQueryFilter(lambda);
+            }
+        }
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

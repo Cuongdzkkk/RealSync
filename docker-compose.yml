@@ -39,6 +39,33 @@ services:
       timeout: 3s
       retries: 5
 
+  # ===== Backend API =====
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: realsync-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=RealSyncDb;User Id=sa;Password=${DB_PASSWORD:-RealSync@Dev2026!};TrustServerCertificate=true
+      - Jwt__Secret=${JWT_SECRET:-RealSync-JWT-Secret-Key-Development-2026-Must-Be-At-Least-32-Characters!}
+      - Jwt__Issuer=RealSync
+      - Jwt__Audience=RealSyncClient
+      - Jwt__ExpiryMinutes=60
+    ports:
+      - "5000:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - realsync-net
+    healthcheck:
+      test: curl -f http://localhost:8080/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   # ===== Seq (Logging) - Optional =====
   # seq:
   #   image: datalust/seq:latest

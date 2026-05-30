@@ -15,6 +15,7 @@ public static class DataSeeder
         await SeedRolesAsync(context);
         await SeedPropertyTypesAsync(context);
         await SeedAreasAsync(context);
+        await SeedPermissionsAsync(context);
         await SeedAdminUserAsync(context);
 
         await context.SaveChangesAsync();
@@ -95,24 +96,133 @@ public static class DataSeeder
         context.Areas.AddRange(hnDistricts);
     }
 
+    private static async Task SeedPermissionsAsync(RealSyncDbContext context)
+    {
+        if (await context.Permissions.AnyAsync()) return;
+
+        // Tạo permissions
+        var permissions = new List<Permission>
+        {
+            // Properties
+            new() { Name = "properties.read", Group = "properties", Description = "Xem bất động sản" },
+            new() { Name = "properties.create", Group = "properties", Description = "Tạo bất động sản" },
+            new() { Name = "properties.update", Group = "properties", Description = "Cập nhật bất động sản" },
+            new() { Name = "properties.delete", Group = "properties", Description = "Xóa bất động sản" },
+            // Leads
+            new() { Name = "leads.read", Group = "leads", Description = "Xem khách hàng tiềm năng" },
+            new() { Name = "leads.create", Group = "leads", Description = "Tạo khách hàng tiềm năng" },
+            new() { Name = "leads.update", Group = "leads", Description = "Cập nhật khách hàng tiềm năng" },
+            new() { Name = "leads.delete", Group = "leads", Description = "Xóa khách hàng tiềm năng" },
+            new() { Name = "leads.assign", Group = "leads", Description = "Phân công lead" },
+            // Customers
+            new() { Name = "customers.read", Group = "customers", Description = "Xem khách hàng" },
+            new() { Name = "customers.create", Group = "customers", Description = "Tạo khách hàng" },
+            new() { Name = "customers.update", Group = "customers", Description = "Cập nhật khách hàng" },
+            new() { Name = "customers.delete", Group = "customers", Description = "Xóa khách hàng" },
+            // Users
+            new() { Name = "users.read", Group = "users", Description = "Xem người dùng" },
+            new() { Name = "users.create", Group = "users", Description = "Tạo người dùng" },
+            new() { Name = "users.update", Group = "users", Description = "Cập nhật người dùng" },
+            new() { Name = "users.delete", Group = "users", Description = "Xóa người dùng" },
+            // Dashboard
+            new() { Name = "dashboard.view", Group = "dashboard", Description = "Xem dashboard" },
+            new() { Name = "dashboard.analytics", Group = "dashboard", Description = "Xem analytics" },
+            // System
+            new() { Name = "system.settings", Group = "system", Description = "Quản lý cài đặt hệ thống" },
+            new() { Name = "system.logs", Group = "system", Description = "Xem activity logs" },
+            new() { Name = "system.notifications", Group = "system", Description = "Quản lý thông báo" },
+        };
+
+        context.Permissions.AddRange(permissions);
+        await context.SaveChangesAsync();
+
+        // Lấy roles
+        var admin = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Admin");
+        var manager = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Manager");
+        var agent = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Agent");
+        var viewer = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Viewer");
+
+        if (admin == null || manager == null || agent == null || viewer == null) return;
+
+        var allPermissions = await context.Permissions.ToListAsync();
+
+        // Admin: tất cả quyền
+        foreach (var perm in allPermissions)
+            context.RolePermissions.Add(new RolePermission { RoleId = admin.Id, PermissionId = perm.Id });
+
+        // Manager: phần lớn quyền (trừ system.settings, users.delete)
+        var managerExclude = new[] { "system.settings", "users.delete" };
+        foreach (var perm in allPermissions.Where(p => !managerExclude.Contains(p.Name)))
+            context.RolePermissions.Add(new RolePermission { RoleId = manager.Id, PermissionId = perm.Id });
+
+        // Agent: CRUD properties/leads/customers + dashboard view
+        var agentPermNames = new[]
+        {
+            "properties.read", "properties.create", "properties.update",
+            "leads.read", "leads.create", "leads.update",
+            "customers.read", "customers.create", "customers.update",
+            "dashboard.view"
+        };
+        foreach (var perm in allPermissions.Where(p => agentPermNames.Contains(p.Name)))
+            context.RolePermissions.Add(new RolePermission { RoleId = agent.Id, PermissionId = perm.Id });
+
+        // Viewer: chỉ read
+        var viewerPermNames = new[] { "properties.read", "leads.read", "customers.read", "dashboard.view" };
+        foreach (var perm in allPermissions.Where(p => viewerPermNames.Contains(p.Name)))
+            context.RolePermissions.Add(new RolePermission { RoleId = viewer.Id, PermissionId = perm.Id });
+    }
+
     private static async Task SeedAdminUserAsync(RealSyncDbContext context)
     {
         if (await context.Users.AnyAsync()) return;
 
         var adminRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Admin");
-        if (adminRole == null) return;
+        var managerRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Manager");
+        var agentRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Agent");
+        var viewerRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Viewer");
 
-        var admin = new User
+        if (adminRole == null || managerRole == null || agentRole == null || viewerRole == null) return;
+
+        var users = new[]
         {
-            FullName = "System Admin",
-            Email = "admin@realsync.vn",
-            // BCrypt hash của "Admin@123" — PHẢI đổi password sau khi deploy
-            PasswordHash = "$2a$11$placeholder.hash.will.be.replaced.in.production",
-            Phone = "0900000000",
-            IsActive = true,
-            RoleId = adminRole.Id,
+            new User
+            {
+                FullName = "System Admin",
+                Email = "admin@realsync.vn",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"),
+                Phone = "0900000001",
+                IsActive = true,
+                RoleId = adminRole.Id,
+            },
+            new User
+            {
+                FullName = "Cường Manager",
+                Email = "cuong@realsync.vn",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Cuong@123"),
+                Phone = "0900000002",
+                IsActive = true,
+                RoleId = managerRole.Id,
+            },
+            new User
+            {
+                FullName = "Lộc Agent",
+                Email = "loc@realsync.vn",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Loc@123"),
+                Phone = "0900000003",
+                IsActive = true,
+                RoleId = agentRole.Id,
+            },
+            new User
+            {
+                FullName = "Danh Viewer",
+                Email = "danh@realsync.vn",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Danh@123"),
+                Phone = "0900000004",
+                IsActive = true,
+                RoleId = viewerRole.Id,
+            },
         };
 
-        context.Users.Add(admin);
+        context.Users.AddRange(users);
     }
 }

@@ -1,0 +1,308 @@
+{
+  "info": {
+    "name": "RealSync API — Team Testing",
+    "_postman_id": "realsync-team-testing",
+    "description": "RealSync API Collection.\n\nTài khoản test đã được seed sẵn trong database.\nChỉ cần import file này vào Postman, chạy request Login là tự động lưu token.\n\n## Tài khoản test:\n| Role    | Email               | Password   |\n|---------|---------------------|------------|\n| Admin   | admin@realsync.vn   | Admin@123  |\n| Manager | cuong@realsync.vn   | Cuong@123  |\n| Agent   | loc@realsync.vn     | Loc@123    |\n| Viewer  | danh@realsync.vn    | Danh@123   |",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5178/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "🔐 Auth",
+      "item": [
+        {
+          "name": "Login — Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                  "    console.log('✅ Token saved! Role: Admin');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@realsync.vn\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Đăng nhập Admin. Token tự động lưu vào collection variables."
+          }
+        },
+        {
+          "name": "Login — Manager (Cường)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                  "    console.log('✅ Token saved! Role: Manager');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"cuong@realsync.vn\",\n  \"password\": \"Cuong@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Đăng nhập Cường (Manager)."
+          }
+        },
+        {
+          "name": "Login — Agent (Lộc)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                  "    console.log('✅ Token saved! Role: Agent');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"loc@realsync.vn\",\n  \"password\": \"Loc@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Đăng nhập Lộc (Agent)."
+          }
+        },
+        {
+          "name": "Login — Viewer (Danh)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                  "    console.log('✅ Token saved! Role: Viewer');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"danh@realsync.vn\",\n  \"password\": \"Danh@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Đăng nhập Danh (Viewer)."
+          }
+        },
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Nguyễn Văn A\",\n  \"email\": \"test@realsync.vn\",\n  \"password\": \"Test@123\",\n  \"phone\": \"0901234567\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "Đăng ký tài khoản mới. Role mặc định: Agent."
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "refresh-token"]
+            },
+            "description": "Refresh access token. Token mới tự động lưu."
+          }
+        }
+      ],
+      "description": "Authentication endpoints. Chạy Login trước, token tự lưu, các request khác tự gắn token."
+    },
+    {
+      "name": "📊 Dashboard",
+      "item": [
+        {
+          "name": "Get Statistics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/statistics",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard", "statistics"]
+            },
+            "description": "Tổng quan: số Leads, Properties, Customers + Growth rate.\nYêu cầu permission: dashboard.view"
+          }
+        },
+        {
+          "name": "Get Monthly Leads Chart",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/chart/monthly-leads",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard", "chart", "monthly-leads"]
+            },
+            "description": "Dữ liệu biểu đồ Lead theo tháng.\nYêu cầu permission: dashboard.analytics"
+          }
+        },
+        {
+          "name": "Get Properties by Status Chart",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/chart/properties-by-status",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard", "chart", "properties-by-status"]
+            },
+            "description": "Dữ liệu biểu đồ Properties phân theo trạng thái.\nYêu cầu permission: dashboard.analytics"
+          }
+        }
+      ],
+      "description": "Dashboard analytics APIs. Cần đăng nhập trước."
+    },
+    {
+      "name": "📋 Activity Logs",
+      "item": [
+        {
+          "name": "Get Activity Logs (Paginated)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/activity?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["activity"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" }
+              ]
+            },
+            "description": "Xem lịch sử hoạt động hệ thống (phân trang).\nYêu cầu permission: system.logs"
+          }
+        }
+      ],
+      "description": "Activity tracking (audit trail)"
+    },
+    {
+      "name": "💚 Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:5178/health",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5178",
+              "path": ["health"]
+            },
+            "description": "Kiểm tra tình trạng API server và database connection."
+          }
+        }
+      ]
+    }
+  ]
+}

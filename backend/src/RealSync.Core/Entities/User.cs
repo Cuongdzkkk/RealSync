@@ -19,4 +19,7 @@ public class User : BaseEntity
 
     // Navigation
     public ICollection<Lead> AssignedLeads { get; set; } = new List<Lead>();
+    public ICollection<Customer> AssignedCustomers { get; set; } = new List<Customer>();
+    public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
+    public ICollection<ActivityLog> ActivityLogs { get; set; } = new List<ActivityLog>();
 }

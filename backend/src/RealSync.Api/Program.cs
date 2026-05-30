@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using RealSync.Api.Extensions;
 using RealSync.Api.Middlewares;
@@ -37,6 +38,8 @@ try
                     errorNumbersToAdd: null);
             }));
 
+
+
     // Application services (DI)
     builder.Services.AddApplicationServices();
 
@@ -57,6 +60,19 @@ try
     builder.Services.AddHealthChecks()
         .AddDbContextCheck<RealSyncDbContext>("database");
 
+    // Rate Limiting
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.AddFixedWindowLimiter("GlobalPolicy", opt =>
+        {
+            opt.PermitLimit = 100;
+            opt.Window = TimeSpan.FromMinutes(1);
+            opt.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+            opt.QueueLimit = 2;
+        });
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    });
+
     var app = builder.Build();
 
     // ===== Database Migration & Seed (Development only) =====
@@ -71,6 +87,8 @@ try
     // ===== Middleware Pipeline =====
     app.UseSerilogRequestLogging();
     app.UseMiddleware<ExceptionHandlingMiddleware>();
+    app.UseMiddleware<SecurityHeadersMiddleware>();
+    app.UseRateLimiter();
 
     if (app.Environment.IsDevelopment())
     {
@@ -86,7 +104,7 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
 
-    app.MapControllers();
+    app.MapControllers().RequireRateLimiting("GlobalPolicy");
     app.MapHealthChecks("/health");
 
     Log.Information("🚀 RealSync API started successfully");

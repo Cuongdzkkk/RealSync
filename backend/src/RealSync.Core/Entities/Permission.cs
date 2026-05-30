@@ -1,14 +1,15 @@
 namespace RealSync.Core.Entities;
 
 /// <summary>
-/// Vai trò người dùng: Admin, Manager, Agent, Viewer.
+/// Quyền hạn trong hệ thống.
+/// Ví dụ: "leads.create", "properties.read", "users.delete".
 /// </summary>
-public class Role : BaseEntity
+public class Permission : BaseEntity
 {
     public string Name { get; set; } = string.Empty;
+    public string? Group { get; set; }
     public string? Description { get; set; }
 
     // Navigation
-    public ICollection<User> Users { get; set; } = new List<User>();
     public ICollection<RolePermission> RolePermissions { get; set; } = new List<RolePermission>();
 }

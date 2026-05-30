@@ -22,6 +22,77 @@ namespace RealSync.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("RealSync.Core.Entities.ActivityLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid?>("EntityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("NewValues")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OldValues")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Action");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("EntityType", "EntityId");
+
+                    b.ToTable("ActivityLogs", (string)null);
+                });
+
             modelBuilder.Entity("RealSync.Core.Entities.Area", b =>
                 {
                     b.Property<Guid>("Id")
@@ -267,6 +338,78 @@ namespace RealSync.Data.Migrations
                     b.ToTable("CrawlSources", (string)null);
                 });
 
+            modelBuilder.Entity("RealSync.Core.Entities.Customer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("AssignedToId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Company")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("ConvertedFromLeadId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Source")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignedToId");
+
+                    b.HasIndex("ConvertedFromLeadId");
+
+                    b.HasIndex("Email");
+
+                    b.HasIndex("Phone");
+
+                    b.ToTable("Customers", (string)null);
+                });
+
             modelBuilder.Entity("RealSync.Core.Entities.Lead", b =>
                 {
                     b.Property<Guid>("Id")
@@ -424,6 +567,120 @@ namespace RealSync.Data.Migrations
                     b.HasIndex("PerformedById");
 
                     b.ToTable("LeadActivities", (string)null);
+                });
+
+            modelBuilder.Entity("RealSync.Core.Entities.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Data")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Link")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "IsRead");
+
+                    b.ToTable("Notifications", (string)null);
+                });
+
+            modelBuilder.Entity("RealSync.Core.Entities.Permission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("Group")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Group");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Permissions", (string)null);
                 });
 
             modelBuilder.Entity("RealSync.Core.Entities.Project", b =>
@@ -805,6 +1062,21 @@ namespace RealSync.Data.Migrations
                     b.ToTable("Roles", (string)null);
                 });
 
+            modelBuilder.Entity("RealSync.Core.Entities.RolePermission", b =>
+                {
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PermissionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("RoleId", "PermissionId");
+
+                    b.HasIndex("PermissionId");
+
+                    b.ToTable("RolePermissions", (string)null);
+                });
+
             modelBuilder.Entity("RealSync.Core.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -871,6 +1143,16 @@ namespace RealSync.Data.Migrations
                     b.ToTable("Users", (string)null);
                 });
 
+            modelBuilder.Entity("RealSync.Core.Entities.ActivityLog", b =>
+                {
+                    b.HasOne("RealSync.Core.Entities.User", "User")
+                        .WithMany("ActivityLogs")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("RealSync.Core.Entities.Area", b =>
                 {
                     b.HasOne("RealSync.Core.Entities.Area", "Parent")
@@ -910,6 +1192,23 @@ namespace RealSync.Data.Migrations
                     b.Navigation("Property");
                 });
 
+            modelBuilder.Entity("RealSync.Core.Entities.Customer", b =>
+                {
+                    b.HasOne("RealSync.Core.Entities.User", "AssignedTo")
+                        .WithMany("AssignedCustomers")
+                        .HasForeignKey("AssignedToId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("RealSync.Core.Entities.Lead", "ConvertedFromLead")
+                        .WithMany()
+                        .HasForeignKey("ConvertedFromLeadId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AssignedTo");
+
+                    b.Navigation("ConvertedFromLead");
+                });
+
             modelBuilder.Entity("RealSync.Core.Entities.Lead", b =>
                 {
                     b.HasOne("RealSync.Core.Entities.User", "AssignedTo")
@@ -943,6 +1242,17 @@ namespace RealSync.Data.Migrations
                     b.Navigation("Lead");
 
                     b.Navigation("PerformedBy");
+                });
+
+            modelBuilder.Entity("RealSync.Core.Entities.Notification", b =>
+                {
+                    b.HasOne("RealSync.Core.Entities.User", "User")
+                        .WithMany("Notifications")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("RealSync.Core.Entities.Project", b =>
@@ -999,6 +1309,25 @@ namespace RealSync.Data.Migrations
                     b.Navigation("Property");
                 });
 
+            modelBuilder.Entity("RealSync.Core.Entities.RolePermission", b =>
+                {
+                    b.HasOne("RealSync.Core.Entities.Permission", "Permission")
+                        .WithMany("RolePermissions")
+                        .HasForeignKey("PermissionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("RealSync.Core.Entities.Role", "Role")
+                        .WithMany("RolePermissions")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Permission");
+
+                    b.Navigation("Role");
+                });
+
             modelBuilder.Entity("RealSync.Core.Entities.User", b =>
                 {
                     b.HasOne("RealSync.Core.Entities.Role", "Role")
@@ -1034,6 +1363,11 @@ namespace RealSync.Data.Migrations
                     b.Navigation("Activities");
                 });
 
+            modelBuilder.Entity("RealSync.Core.Entities.Permission", b =>
+                {
+                    b.Navigation("RolePermissions");
+                });
+
             modelBuilder.Entity("RealSync.Core.Entities.Project", b =>
                 {
                     b.Navigation("Properties");
@@ -1051,12 +1385,20 @@ namespace RealSync.Data.Migrations
 
             modelBuilder.Entity("RealSync.Core.Entities.Role", b =>
                 {
+                    b.Navigation("RolePermissions");
+
                     b.Navigation("Users");
                 });
 
             modelBuilder.Entity("RealSync.Core.Entities.User", b =>
                 {
+                    b.Navigation("ActivityLogs");
+
+                    b.Navigation("AssignedCustomers");
+
                     b.Navigation("AssignedLeads");
+
+                    b.Navigation("Notifications");
                 });
 #pragma warning restore 612, 618
         }

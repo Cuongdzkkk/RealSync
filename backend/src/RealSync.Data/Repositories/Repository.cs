@@ -29,14 +29,14 @@ public class Repository<T> : IRepository<T> where T : BaseEntity
 
     public virtual async Task<IEnumerable<T>> GetAllAsync()
     {
-        return await _dbSet.ToListAsync();
+        return await _dbSet.AsNoTracking().ToListAsync();
     }
 
     public virtual async Task<(IEnumerable<T> Items, int TotalCount)> GetPagedAsync(
         PaginationRequest pagination,
         Expression<Func<T, bool>>? filter = null)
     {
-        IQueryable<T> query = _dbSet;
+        IQueryable<T> query = _dbSet.AsNoTracking();
 
         if (filter != null)
             query = query.Where(filter);
