@@ -3,13 +3,14 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import { useAppStore } from '@/stores/useAppStore';
 import AppSidebar from './AppSidebar.vue';
 import AppTopbar from './AppTopbar.vue';
+import ActivityTimelinePanel from './ActivityTimelinePanel.vue';
+import FloatingAiAssistant from './FloatingAiAssistant.vue';
 import CommandPalette from '@/components/common/CommandPalette.vue';
 import ToastContainer from '@/components/common/ToastContainer.vue';
-import MessagesPanel from '@/components/panels/MessagesPanel.vue';
-import { mockMessages } from '@/utils/mockData';
 
 const appStore = useAppStore();
 const commandPaletteOpen = ref(false);
+const timelineOpen = ref(true);
 
 function openCommandPalette() {
   commandPaletteOpen.value = true;
@@ -17,6 +18,10 @@ function openCommandPalette() {
 
 function closeCommandPalette() {
   commandPaletteOpen.value = false;
+}
+
+function toggleTimeline() {
+  timelineOpen.value = !timelineOpen.value;
 }
 
 function handleGlobalKeydown(e: KeyboardEvent) {
@@ -36,20 +41,54 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="admin-shell">
+  <div class="admin-shell" :class="appStore.theme">
+    <!-- App Sidebar (Collapsible Mini Sidebar) -->
     <AppSidebar />
 
     <div class="admin-main">
-      <AppTopbar @open-command-palette="openCommandPalette" />
+      <!-- Sticky Topbar -->
+      <AppTopbar 
+        @open-command-palette="openCommandPalette" 
+        @toggle-timeline="toggleTimeline"
+      />
 
-      <main class="admin-content">
-        <RouterView />
-        <aside class="col-right">
-          <MessagesPanel :messages="mockMessages" />
+      <!-- Asymmetric Layout Content Area -->
+      <div class="admin-content" :class="{ 'timeline-hidden': !timelineOpen }">
+        <!-- Center/Main Dashboard View -->
+        <main class="main-viewport">
+          <RouterView />
+        </main>
+
+        <!-- Right Side Panel: Activity Timeline (Collapsible) -->
+        <aside v-if="timelineOpen" class="timeline-viewport glass-card">
+          <button class="timeline-close-btn" @click="toggleTimeline" title="Ẩn hoạt động">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+          <ActivityTimelinePanel />
         </aside>
-      </main>
+      </div>
+
+      <!-- Quick toggle button when Timeline is closed -->
+      <button 
+        v-if="!timelineOpen" 
+        class="timeline-toggle-btn glass-card glow-yellow"
+        @click="toggleTimeline"
+        title="Hiện hoạt động hệ thống"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="12 8 8 12 12 16" />
+          <line x1="16" y1="12" x2="8" y2="12" />
+        </svg>
+      </button>
     </div>
 
+    <!-- Floating AI Assistant Panel -->
+    <FloatingAiAssistant />
+
+    <!-- Command Palette (Linear/Notion search style) -->
     <CommandPalette
       v-if="commandPaletteOpen"
       @close="closeCommandPalette"
@@ -63,8 +102,11 @@ onUnmounted(() => {
 .admin-shell {
   display: flex;
   min-height: 100dvh;
-  background: #FAFAFA;
-  font-family: var(--font-ui);
+  background: var(--color-canvas);
+  background-image: var(--color-mesh-bg);
+  background-attachment: fixed;
+  transition: background var(--duration-base) var(--ease-standard);
+  position: relative;
 }
 
 .admin-main {
@@ -72,56 +114,94 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  position: relative;
 }
 
 .admin-content {
   display: grid;
-  grid-template-columns: 2fr 1.75fr 1.25fr;
+  grid-template-columns: 1fr 320px;
+  flex: 1;
   min-height: calc(100dvh - 60px);
+  position: relative;
+  transition: all var(--duration-base) var(--ease-standard);
 }
 
-/* Child pages render col-left + col-center; right column is built-in */
-:deep(.col-left) {
-  border-right: 1px solid #E8E8E8;
-  padding: 24px;
+.admin-content.timeline-hidden {
+  grid-template-columns: 1fr;
 }
 
-:deep(.col-center) {
-  border-right: 1px solid #E8E8E8;
+.main-viewport {
   padding: 24px;
+  overflow-y: auto;
+  min-width: 0;
 }
 
-.col-right {
-  padding: 24px;
-  background: var(--color-surface);
+.timeline-viewport {
+  border-left: 1px solid var(--color-border);
+  border-right: none;
+  border-top: none;
+  border-bottom: none;
+  border-radius: 0;
+  background: var(--color-sidebar-bg);
+  padding: 24px 20px;
+  height: calc(100dvh - 60px);
   position: sticky;
   top: 60px;
-  height: calc(100dvh - 60px);
   overflow-y: auto;
+  box-shadow: none;
+  transition: all var(--duration-base) var(--ease-standard);
 }
 
-/* Full-width pages via .page class or .col-span-2 marker */
-:deep(.col-span-2) {
-  grid-column: 1 / 3;
-  padding: 24px;
-  border-right: 1px solid #E8E8E8;
+.timeline-close-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
 }
 
-:deep(.page) {
-  grid-column: 1 / 3;
-  padding: 24px;
-  border-right: 1px solid #E8E8E8;
+.timeline-close-btn:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.timeline-toggle-btn {
+  position: fixed;
+  top: 76px;
+  right: 20px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--elevation-surface);
+  transition: all var(--duration-fast);
+}
+
+.timeline-toggle-btn:hover {
+  background: var(--color-yellow);
+  color: var(--color-yellow-text);
+  transform: translateX(-2px);
 }
 
 @media (max-width: 1024px) {
   .admin-content {
     grid-template-columns: 1fr;
   }
-  :deep(.col-left), :deep(.col-center) {
-    border-right: none;
-    border-bottom: 1px solid #E8E8E8;
+  .timeline-viewport {
+    display: none;
   }
-  .col-right {
+  .timeline-toggle-btn {
     display: none;
   }
 }

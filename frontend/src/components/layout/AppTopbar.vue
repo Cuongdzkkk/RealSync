@@ -1,78 +1,126 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { Search, Bell, Expand, Fold } from '@element-plus/icons-vue';
 import { useAppStore } from '@/stores/useAppStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 const emit = defineEmits<{
   (e: 'openCommandPalette'): void;
 }>();
 
 const appStore = useAppStore();
+const authStore = useAuthStore();
 const route = useRoute();
 
 const pageTitle = computed(() => route.meta.title as string || 'RealSync');
 const notifCount = ref(3);
-const showNotifs = ref(false);
+const showRoleDropdown = ref(false);
 
-const tabs = ['Tổng quan', 'Sản phẩm', 'Giao dịch', 'Khách hàng', 'Phân tích'];
-const activeTab = 'Sản phẩm';
+const availableRoles = ['Admin', 'Manager', 'Sales', 'Marketing', 'Data Analyst'] as const;
+
+function switchRole(role: typeof availableRoles[number]) {
+  if (authStore.user) {
+    authStore.user.role = role;
+    if (role === 'Admin') {
+      authStore.user.fullName = 'RealSync Admin';
+    } else if (role === 'Manager') {
+      authStore.user.fullName = 'Trần Kinh Doanh (Manager)';
+    } else if (role === 'Sales') {
+      authStore.user.fullName = 'Lê Thị Sales (Sales)';
+    } else if (role === 'Marketing') {
+      authStore.user.fullName = 'Hoàng Quảng Cáo (Marketing)';
+    } else {
+      authStore.user.fullName = 'Phan Phân Tích (Analyst)';
+    }
+  }
+  showRoleDropdown.value = false;
+}
 </script>
 
 <template>
-  <header class="topbar">
+  <header class="topbar glass-nav">
     <div class="topbar-left">
-      <button class="topbar-icon-btn" @click="appStore.toggleSidebar()" :title="appStore.sidebarCollapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'">
-        <el-icon :size="18">
-          <Fold v-if="!appStore.sidebarCollapsed" />
-          <Expand v-else />
-        </el-icon>
+      <button class="topbar-icon-btn" @click="appStore.toggleSidebar()" :title="appStore.sidebarCollapsed ? 'Mở rộng' : 'Thu gọn'">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <line v-if="!appStore.sidebarCollapsed" x1="3" y1="12" x2="21" y2="12" />
+          <line v-if="!appStore.sidebarCollapsed" x1="3" y1="6" x2="21" y2="6" />
+          <line v-if="!appStore.sidebarCollapsed" x1="3" y1="18" x2="21" y2="18" />
+          
+          <path v-else d="M4 12h16M4 6h16M4 18h16" />
+        </svg>
       </button>
       <div class="topbar-divider-line" />
       <h1 class="page-title">{{ pageTitle }}</h1>
+      
+      <span class="role-badge" :class="`role-badge--${authStore.user?.role?.toLowerCase().replace(' ', '-')}`">
+        {{ authStore.user?.role }}
+      </span>
     </div>
 
-    <nav class="topbar-tabs">
-      <button
-        v-for="tab in tabs"
-        :key="tab"
-        class="tab-pill"
-        :class="{ 'tab-pill--active': tab === activeTab }"
-      >
-        {{ tab }}
-      </button>
-    </nav>
-
     <div class="topbar-right">
-      <!-- Search / Command Palette -->
-      <button class="topbar-icon-btn topbar-search-btn" @click="emit('openCommandPalette')">
-        <el-icon :size="16"><Search /></el-icon>
-        <span class="topbar-search-hint">Tìm kiếm...</span>
+      <!-- Search / Command Palette (Linear-style) -->
+      <button class="topbar-search-btn" @click="emit('openCommandPalette')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <span class="topbar-search-hint">Tìm kiếm lệnh...</span>
         <kbd class="topbar-kbd">⌘K</kbd>
       </button>
 
+      <!-- Theme Switcher (Light/Dark) -->
+      <button class="topbar-icon-btn" @click="appStore.toggleTheme()" :title="appStore.theme === 'light' ? 'Chuyển sang chế độ tối' : 'Chuyển sang chế độ sáng'">
+        <svg v-if="appStore.theme === 'light'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+        </svg>
+        <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5" />
+          <line x1="12" y1="1" x2="12" y2="3" />
+          <line x1="12" y1="21" x2="12" y2="23" />
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+          <line x1="1" y1="12" x2="3" y2="12" />
+          <line x1="21" y1="12" x2="23" y2="12" />
+          <line x1="4.22" y1="19.07" x2="5.64" y2="17.66" />
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+        </svg>
+      </button>
+
       <!-- Notifications -->
-      <div class="topbar-notif-wrapper">
-        <button class="topbar-icon-btn" @click="showNotifs = !showNotifs">
-          <el-badge :value="notifCount" :hidden="notifCount === 0" class="topbar-badge">
-            <el-icon :size="18"><Bell /></el-icon>
-          </el-badge>
-        </button>
-      </div>
+      <button class="topbar-icon-btn relative">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
+        <span v-if="notifCount > 0" class="notif-badge">{{ notifCount }}</span>
+      </button>
 
       <!-- Divider -->
       <div class="topbar-divider-line" />
 
-      <!-- CTA -->
-      <button class="btn-new">+ Thêm mới</button>
+      <!-- Role Switcher for Testing (HubSpot/Linear theme testing) -->
+      <div class="role-selector-container">
+        <button class="role-switcher-btn" @click="showRoleDropdown = !showRoleDropdown">
+          <span>Đổi vai trò</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div v-if="showRoleDropdown" class="role-dropdown-menu glass-card">
+          <button 
+            v-for="role in availableRoles" 
+            :key="role" 
+            class="dropdown-item"
+            :class="{ 'is-active': authStore.user?.role === role }"
+            @click="switchRole(role)"
+          >
+            {{ role }}
+          </button>
+        </div>
+      </div>
 
-      <!-- User Avatar -->
-      <button class="topbar-user">
-        <span class="topbar-user__avatar">A</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="topbar-user__chevron">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
+      <!-- Quick Action + CTA -->
+      <button class="btn-new glow-yellow">+ Thêm Lead</button>
     </div>
   </header>
 </template>
@@ -80,8 +128,10 @@ const activeTab = 'Sản phẩm';
 <style scoped>
 .topbar {
   height: 60px;
-  background: #FFFFFF;
-  border-bottom: 1px solid #E8E8E8;
+  background: var(--color-surface);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--color-border);
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
@@ -90,9 +140,10 @@ const activeTab = 'Sản phẩm';
   justify-content: space-between;
   padding: 0 20px;
   gap: 12px;
+  transition: background-color var(--duration-base) var(--ease-standard),
+              border-color var(--duration-base) var(--ease-standard);
 }
 
-/* ── Left ──────────────────────────────────────── */
 .topbar-left {
   display: flex;
   align-items: center;
@@ -104,200 +155,201 @@ const activeTab = 'Sản phẩm';
   width: 34px;
   height: 34px;
   border-radius: 8px;
-  border: none;
+  border: 1px solid transparent;
   background: transparent;
-  color: #6B6B6B;
+  color: var(--color-text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background var(--duration-fast) var(--ease-standard),
-              color var(--duration-fast) var(--ease-standard);
+  position: relative;
+  transition: all var(--duration-fast) var(--ease-standard);
 }
 
 .topbar-icon-btn:hover {
-  background: #F5F5F5;
-  color: #0D0D0D;
+  background: var(--color-surface-hover);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
 }
 
 .topbar-divider-line {
   width: 1px;
-  height: 24px;
-  background: #E8E8E8;
+  height: 20px;
+  background: var(--color-border);
   flex-shrink: 0;
 }
 
 .page-title {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: -0.01em;
-  color: #0D0D0D;
+  letter-spacing: -0.02em;
+  color: var(--color-text-primary);
   margin: 0;
   white-space: nowrap;
 }
 
-/* ── Center: Tab Pills ─────────────────────────── */
-.topbar-tabs {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.role-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
+.role-badge--admin { background: var(--color-yellow-muted); color: var(--color-yellow-hover); border: 1px solid rgba(250, 204, 21, 0.2); }
+.role-badge--manager { background: var(--color-info-bg); color: var(--color-info); border: 1px solid var(--color-info-border); }
+.role-badge--sales { background: var(--color-success-bg); color: var(--color-success); border: 1px solid var(--color-success-border); }
+.role-badge--marketing { background: rgba(168, 85, 247, 0.08); color: rgb(168, 85, 247); border: 1px solid rgba(168, 85, 247, 0.2); }
+.role-badge--data-analyst { background: var(--color-ai-bg); color: var(--color-ai); border: 1px solid var(--color-ai-border); }
 
-.tab-pill {
-  font-size: 13px;
-  font-weight: 500;
-  color: #6B6B6B;
-  padding: 6px 14px;
-  border-radius: 20px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-standard);
-}
-
-.tab-pill:hover {
-  background: #F5F5F5;
-  color: #0D0D0D;
-}
-
-.tab-pill--active {
-  background: #0D0D0D;
-  color: #FFFFFF;
-}
-
-.tab-pill--active:hover {
-  background: #0D0D0D;
-  color: #FFFFFF;
-}
-
-/* ── Right ─────────────────────────────────────── */
 .topbar-right {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-/* Search button with hint */
+/* Linear-style Search Input button */
 .topbar-search-btn {
-  width: auto;
+  display: flex;
+  align-items: center;
   gap: 8px;
-  padding: 0 12px;
-  justify-content: flex-start;
-  border: 1px solid #E8E8E8;
+  padding: 0 10px;
+  background: var(--color-surface-glass);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   height: 34px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  transition: all var(--duration-fast) var(--ease-standard);
 }
 
 .topbar-search-btn:hover {
-  border-color: #D0D0D0;
-}
-
-.topbar-search-btn:focus-visible,
-.topbar-search-btn:active {
-  border-color: #F5E642;
-  background: #FEFBEA;
-  box-shadow: 0 0 0 3px rgba(245, 230, 66, 0.25);
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
 }
 
 .topbar-search-hint {
-  font-size: 13px;
-  color: #ABABAB;
-  white-space: nowrap;
+  font-size: 12px;
+  color: var(--color-text-muted);
 }
 
 .topbar-kbd {
   font-family: var(--font-mono);
-  font-size: 10px;
-  color: #ABABAB;
-  background: #F5F5F5;
-  border: 1px solid #E8E8E8;
+  font-size: 9px;
+  color: var(--color-text-muted);
+  background: var(--color-divider);
+  border: 1px solid var(--color-border);
   border-radius: 4px;
-  padding: 1px 5px;
-  line-height: 1.4;
+  padding: 1px 4px;
+  line-height: 1.2;
 }
 
-/* Notifications */
-.topbar-notif-wrapper {
+.notif-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background-color: var(--color-danger);
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 700;
+  height: 14px;
+  min-width: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 99px;
+  border: 1px solid var(--color-surface);
+}
+
+/* Role Selector */
+.role-selector-container {
   position: relative;
 }
 
-:deep(.topbar-badge .el-badge__content) {
-  font-size: 9px;
-  font-weight: 700;
-  height: 16px;
-  line-height: 16px;
-  padding: 0 5px;
-  border: 1px solid #FFFFFF;
-  background: #DC2626;
+.role-switcher-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-surface-glass);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.role-switcher-btn:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+}
+
+.role-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  z-index: var(--z-overlay);
+}
+
+.dropdown-item {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  text-align: left;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+
+.dropdown-item:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.dropdown-item.is-active {
+  background: var(--color-yellow-muted);
+  color: var(--color-yellow-hover);
+  font-weight: 600;
 }
 
 /* CTA */
 .btn-new {
-  background: #F5E642;
-  color: #0D0D0D;
-  font-size: 13px;
+  background: var(--color-yellow);
+  color: var(--color-yellow-text);
+  font-size: 12px;
   font-weight: 600;
   border: none;
-  border-radius: 20px;
-  padding: 7px 16px;
+  border-radius: 8px;
+  padding: 0 14px;
+  height: 34px;
   cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-standard);
+  display: flex;
+  align-items: center;
+  transition: all var(--duration-fast) var(--ease-standard);
   white-space: nowrap;
 }
 
 .btn-new:hover {
-  background: #EDD800;
+  background: var(--color-yellow-hover);
+  transform: scale(1.02);
 }
 
-/* User Avatar */
-.topbar-user {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 4px 8px 4px 4px;
-  border-radius: 8px;
-  transition: background var(--duration-fast) var(--ease-standard);
-}
-
-.topbar-user:hover {
-  background: #F5F5F5;
-}
-
-.topbar-user__avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 9999px;
-  background: #F5E642;
-  color: #0D0D0D;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.topbar-user__chevron {
-  color: #ABABAB;
-  flex-shrink: 0;
-}
-
-/* ── Responsive ────────────────────────────────── */
 @media (max-width: 900px) {
-  .topbar-tabs {
-    display: none;
-  }
   .topbar-search-hint,
   .topbar-kbd {
     display: none;
-  }
-  .topbar-search-btn {
-    width: 34px;
-    padding: 0;
-    justify-content: center;
   }
 }
 </style>
