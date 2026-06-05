@@ -9,65 +9,93 @@ const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 
-interface SidebarIcon {
+interface NavItem {
   label: string;
   to: string;
-  icon: string;
-  ai?: boolean;
+  icon: string; // SVG path
+  group: 'crm' | 'properties' | 'ai' | 'crawler' | 'analytics' | 'admin';
+  roles: ('Admin' | 'Manager' | 'Sales' | 'Marketing' | 'Data Analyst')[];
+  badge?: string;
+  isAi?: boolean;
 }
 
-const navIcons: SidebarIcon[] = [
+const navItems: NavItem[] = [
+  // Dashboard is visible to all, but displays custom KPIs based on role
   {
     label: 'Tổng quan',
     to: '/admin/dashboard',
-    icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1'
+    icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1',
+    group: 'crm',
+    roles: ['Admin', 'Manager', 'Sales', 'Marketing', 'Data Analyst']
   },
+  // CRM Group
   {
-    label: 'Sản phẩm',
+    label: 'Khách hàng (Leads)',
+    to: '/admin/leads',
+    icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
+    group: 'crm',
+    roles: ['Admin', 'Manager', 'Sales'],
+    badge: 'Hot'
+  },
+  // Properties Group
+  {
+    label: 'Bất động sản',
     to: '/admin/properties',
-    icon: 'M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z'
+    icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3',
+    group: 'properties',
+    roles: ['Admin', 'Sales', 'Marketing']
   },
   {
     label: 'Dự án',
     to: '/admin/projects',
-    icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z'
+    icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5',
+    group: 'properties',
+    roles: ['Admin', 'Marketing']
   },
-  {
-    label: 'Khách hàng',
-    to: '/admin/leads',
-    icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75'
-  },
-  {
-    label: 'Máy thu thập',
-    to: '/admin/crawlers',
-    icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1'
-  },
+  // AI Center Group
   {
     label: 'Phân loại AI',
     to: '/admin/ai-classification',
-    icon: 'M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 00.659 1.591L19 14.5M14.25 3.104c.251.023.501.05.75.082M19 14.5l-1.471 4.412a1.5 1.5 0 01-1.423 1.026H7.894a1.5 1.5 0 01-1.423-1.026L5 14.5m14 0H5',
-    ai: true
+    icon: 'M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0',
+    group: 'ai',
+    roles: ['Admin', 'Manager', 'Sales'],
+    isAi: true
   },
   {
     label: 'Nội dung AI',
     to: '/admin/content-ai',
     icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
-    ai: true
-  }
-];
-
-const systemIcons: SidebarIcon[] = [
+    group: 'ai',
+    roles: ['Admin', 'Sales', 'Marketing'],
+    isAi: true
+  },
+  // Crawler Group
   {
-    label: 'Cài đặt',
+    label: 'Crawler Data',
+    to: '/admin/crawlers',
+    icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1',
+    group: 'crawler',
+    roles: ['Admin', 'Marketing', 'Data Analyst']
+  },
+  // Admin Group
+  {
+    label: 'Cài đặt hệ thống',
     to: '/admin/settings',
-    icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z'
+    icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573',
+    group: 'admin',
+    roles: ['Admin']
   }
 ];
 
 const collapsed = computed(() => appStore.sidebarCollapsed);
-const isActive = (to: string) => route.path === to || route.path.startsWith(to + '/');
+const currentRole = computed(() => authStore.user?.role ?? 'Guest');
 
-const userInitial = computed(() => authStore.user?.fullName?.charAt(0) ?? 'A');
+// Filter nav items based on user role
+const filteredNavItems = computed(() => {
+  return navItems.filter(item => item.roles.includes(currentRole.value as any));
+});
+
+const isActive = (to: string) => route.path === to || route.path.startsWith(to + '/');
 
 function navigateTo(to: string) {
   router.push(to);
@@ -75,185 +103,240 @@ function navigateTo(to: string) {
 </script>
 
 <template>
-  <aside class="sidebar" :class="{ 'sidebar--collapsed': collapsed }">
-    <!-- Logo -->
-    <RouterLink class="sidebar-logo" to="/admin/dashboard" aria-label="RealSync Home">
-      <span class="sidebar-logo-mark">RS</span>
-      <span v-if="!collapsed" class="sidebar-logo-text">RealSync</span>
-    </RouterLink>
-
-    <!-- Main Nav -->
-    <nav class="sidebar-nav" aria-label="Điều hướng chính">
-      <button
-        v-for="item in navIcons"
-        :key="item.to"
-        class="sidebar-btn"
-        :class="{
-          'sidebar-btn--active': isActive(item.to),
-          'sidebar-btn--ai': item.ai
-        }"
-        :data-tooltip="collapsed ? item.label : undefined"
-        :aria-label="item.label"
-        @click="navigateTo(item.to)"
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path :d="item.icon" />
-        </svg>
-        <span v-if="!collapsed" class="sidebar-btn__label">{{ item.label }}</span>
-      </button>
-    </nav>
+  <aside class="sidebar glass-card" :class="{ 'sidebar--collapsed': collapsed }">
+    <!-- Brand Logo -->
+    <div class="sidebar-logo">
+      <div class="logo-mark glow-yellow">
+        <span>RS</span>
+        <!-- Small animated pulse for AI-powered feel -->
+        <span class="logo-pulse"></span>
+      </div>
+      <div v-if="!collapsed" class="logo-text-wrapper">
+        <span class="logo-title">RealSync</span>
+        <span class="logo-subtitle">AI Platform</span>
+      </div>
+    </div>
 
     <!-- Divider -->
     <div class="sidebar-divider" />
 
-    <!-- System Icons -->
-    <div class="sidebar-system">
-      <button
-        v-for="item in systemIcons"
-        :key="item.to"
-        class="sidebar-btn"
-        :class="{ 'sidebar-btn--active': isActive(item.to) }"
-        :data-tooltip="collapsed ? item.label : undefined"
-        :aria-label="item.label"
-        @click="navigateTo(item.to)"
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path :d="item.icon" />
-        </svg>
-        <span v-if="!collapsed" class="sidebar-btn__label">{{ item.label }}</span>
-      </button>
-    </div>
+    <!-- Navigation Lists grouped by type -->
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <span v-if="!collapsed" class="nav-section-title">Menu quản lý</span>
+        <div class="nav-items-list">
+          <button
+            v-for="item in filteredNavItems"
+            :key="item.to"
+            class="sidebar-btn"
+            :class="{
+              'sidebar-btn--active': isActive(item.to),
+              'sidebar-btn--ai': item.isAi
+            }"
+            :data-tooltip="collapsed ? item.label : undefined"
+            :aria-label="item.label"
+            @click="navigateTo(item.to)"
+          >
+            <div class="icon-container">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path :d="item.icon" />
+              </svg>
+              <!-- AI glowing dot -->
+              <span v-if="item.isAi" class="ai-dot"></span>
+            </div>
+            
+            <span v-if="!collapsed" class="sidebar-btn__label">{{ item.label }}</span>
+            
+            <span v-if="item.badge && !collapsed" class="item-badge">{{ item.badge }}</span>
+          </button>
+        </div>
+      </div>
+    </nav>
 
-    <!-- Bottom: Toggle + Avatar -->
-    <div class="sidebar-bottom">
-      <button class="sidebar-toggle" :data-tooltip="collapsed ? 'Mở rộng' : 'Thu gọn'" @click="appStore.toggleSidebar()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Bottom Actions / Profile info -->
+    <div class="sidebar-footer">
+      <button 
+        class="sidebar-toggle-btn" 
+        :title="collapsed ? 'Mở rộng menu' : 'Thu gọn menu'"
+        @click="appStore.toggleSidebar()"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path v-if="collapsed" d="M9 18l6-6-6-6" />
           <path v-else d="M15 18l-6-6 6-6" />
         </svg>
+        <span v-if="!collapsed">Thu gọn</span>
       </button>
-      <button
-        class="sidebar-avatar"
-        :data-tooltip="collapsed ? (authStore.user?.fullName ?? 'Guest') : undefined"
-        aria-label="Tài khoản"
-      >
-        {{ userInitial }}
-        <span v-if="!collapsed" class="sidebar-avatar__name">{{ authStore.user?.fullName ?? 'Guest' }}</span>
-      </button>
+
+      <div class="sidebar-user-section">
+        <div class="user-avatar glow-yellow">
+          {{ authStore.user?.fullName?.charAt(0) ?? 'G' }}
+        </div>
+        <div v-if="!collapsed" class="user-meta">
+          <div class="user-name">{{ authStore.user?.fullName ?? 'Guest' }}</div>
+          <div class="user-role">{{ currentRole }}</div>
+        </div>
+      </div>
     </div>
   </aside>
 </template>
 
 <style scoped>
 .sidebar {
-  width: 200px;
-  background: #FFFFFF;
-  border-right: 1px solid #E8E8E8;
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  height: 100dvh;
+  width: 220px;
+  height: 100vh;
   position: sticky;
   top: 0;
   z-index: var(--z-sidebar);
-  padding: 12px 10px;
-  gap: 2px;
-  transition: width var(--duration-base) var(--ease-standard);
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-sidebar-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid var(--color-sidebar-border);
+  border-left: none;
+  border-top: none;
+  border-bottom: none;
+  border-radius: 0;
+  padding: 16px 12px;
+  gap: 16px;
+  box-shadow: none;
+  transition: width var(--duration-base) var(--ease-spring);
 }
 
 .sidebar--collapsed {
-  width: 56px;
-  padding: 12px 0;
+  width: 68px;
+  padding: 16px 8px;
   align-items: center;
 }
 
-/* ── Logo ──────────────────────────────────────── */
+/* ── Logo ── */
 .sidebar-logo {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-shrink: 0;
-  margin-bottom: 12px;
-  padding: 0 2px;
-  text-decoration: none;
-  min-height: 36px;
+  padding: 0 4px;
 }
 
-.sidebar-logo-mark {
+.logo-mark {
   width: 36px;
   height: 36px;
   min-width: 36px;
-  background: #F5E642;
+  background: var(--color-yellow);
+  color: var(--color-yellow-text);
   border-radius: 8px;
-  color: #0D0D0D;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.05em;
+  position: relative;
 }
 
-.sidebar-logo-text {
+.logo-pulse {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-ai);
+  border: 1.5px solid var(--color-yellow);
+  animation: pulse-ring 2.5s infinite;
+}
+
+.logo-text-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.logo-title {
   font-size: 15px;
   font-weight: 700;
-  color: #0D0D0D;
-  white-space: nowrap;
+  letter-spacing: -0.02em;
+  color: var(--color-text-primary);
+  line-height: 1.1;
 }
 
-.sidebar--collapsed .sidebar-logo {
-  justify-content: center;
-  padding: 0;
+.logo-subtitle {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-ai);
+  letter-spacing: 0.05em;
 }
 
-/* ── Navigation ────────────────────────────────── */
+.sidebar-divider {
+  height: 1px;
+  background-color: var(--color-divider);
+  width: 100%;
+}
+
+/* ── Nav List ── */
 .sidebar-nav {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 20px;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 4px 0;
 }
 
-.sidebar--collapsed .sidebar-nav {
-  align-items: center;
+.nav-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-/* ── Icon Button ───────────────────────────────── */
+.nav-section-title {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  letter-spacing: 0.05em;
+  padding-left: 8px;
+  margin-bottom: 2px;
+}
+
+.nav-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* ── Menu Buttons ── */
 .sidebar-btn {
-  position: relative;
   width: 100%;
-  min-height: 40px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  color: #9E9E9E;
-  cursor: pointer;
+  height: 38px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 0 10px;
-  flex-shrink: 0;
-  transition:
-    background var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  transition: all var(--duration-fast) var(--ease-standard);
 }
 
 .sidebar-btn:hover {
-  background: #F5F5F5;
-  color: #0D0D0D;
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+  border-color: var(--color-border);
 }
 
 .sidebar-btn--active {
-  background: #F5E642;
-  color: #0D0D0D;
+  background: var(--color-yellow) !important;
+  color: var(--color-yellow-text) !important;
+  font-weight: 600;
+  box-shadow: var(--color-yellow-glow);
 }
 
 .sidebar-btn--active:hover {
-  background: #EDD800;
+  background: var(--color-yellow-hover) !important;
 }
 
 .sidebar-btn--ai {
@@ -261,154 +344,160 @@ function navigateTo(to: string) {
 }
 
 .sidebar-btn--ai.sidebar-btn--active {
-  color: #0D0D0D;
+  color: var(--color-yellow-text);
+}
+
+.icon-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.ai-dot {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: var(--color-ai);
 }
 
 .sidebar-btn__label {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12.5px;
   white-space: nowrap;
-  line-height: 1;
+}
+
+.item-badge {
+  margin-left: auto;
+  font-size: 9px;
+  font-weight: 700;
+  background-color: var(--color-danger-bg);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger-border);
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
 }
 
 .sidebar--collapsed .sidebar-btn {
-  width: 40px;
+  width: 42px;
+  height: 42px;
   justify-content: center;
   padding: 0;
 }
 
-/* ── Tooltip (collapsed only) ──────────────────── */
-.sidebar-btn[data-tooltip]::after,
-.sidebar-toggle[data-tooltip]::after {
+/* Tooltip on collapsed state */
+.sidebar-btn[data-tooltip]::after {
   content: attr(data-tooltip);
   position: absolute;
-  left: calc(100% + 10px);
+  left: calc(100% + 12px);
   top: 50%;
   transform: translateY(-50%);
-  background: #0D0D0D;
-  color: #FFFFFF;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.3;
-  padding: 4px 10px;
+  background-color: var(--color-text-primary);
+  color: var(--color-canvas);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
   border-radius: 6px;
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
+  box-shadow: var(--elevation-floating);
   transition: opacity var(--duration-fast) var(--ease-standard);
-  z-index: calc(var(--z-sidebar) + 1);
+  z-index: 999;
 }
 
-.sidebar-btn[data-tooltip]:hover::after,
-.sidebar-toggle[data-tooltip]:hover::after {
+.sidebar-btn[data-tooltip]:hover::after {
   opacity: 1;
 }
 
-/* ── Divider ───────────────────────────────────── */
-.sidebar-divider {
-  width: 100%;
-  height: 1px;
-  background: #E8E8E8;
-  flex-shrink: 0;
-  margin: 4px 0;
-}
-
-.sidebar--collapsed .sidebar-divider {
-  width: 24px;
-}
-
-/* ── System Icons ──────────────────────────────── */
-.sidebar-system {
+/* ── Footer ── */
+.sidebar-footer {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  flex-shrink: 0;
+  gap: 12px;
+  margin-top: auto;
 }
 
-.sidebar--collapsed .sidebar-system {
-  align-items: center;
-}
-
-/* ── Bottom: Toggle + Avatar ───────────────────── */
-.sidebar-bottom {
+.sidebar-toggle-btn {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex-shrink: 0;
-  margin-top: 8px;
-}
-
-.sidebar--collapsed .sidebar-bottom {
   align-items: center;
-}
-
-.sidebar-toggle {
-  position: relative;
-  width: 100%;
-  height: 32px;
-  border-radius: 8px;
-  border: none;
+  gap: 10px;
+  padding: 8px 10px;
   background: transparent;
-  color: #9E9E9E;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
+  border-radius: 6px;
+  transition: all var(--duration-fast);
+}
+
+.sidebar-toggle-btn:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+
+.sidebar--collapsed .sidebar-toggle-btn {
+  width: 42px;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.sidebar--collapsed .sidebar-toggle-btn span {
+  display: none;
+}
+
+.sidebar-user-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 4px;
+  border-top: 1px solid var(--color-divider);
+}
+
+.sidebar--collapsed .sidebar-user-section {
+  justify-content: center;
+  border-top: none;
+  padding: 6px 0;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--color-yellow);
+  color: var(--color-yellow-text);
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background var(--duration-fast) var(--ease-standard),
-              color var(--duration-fast) var(--ease-standard);
+  flex-shrink: 0;
 }
 
-.sidebar-toggle:hover {
-  background: #F5F5F5;
-  color: #0D0D0D;
-}
-
-.sidebar--collapsed .sidebar-toggle {
-  width: 32px;
-}
-
-.sidebar-avatar {
-  position: relative;
-  width: 100%;
-  height: 36px;
-  border-radius: 8px;
-  background: #F5E642;
-  color: #0D0D0D;
-  border: none;
-  cursor: pointer;
+.user-meta {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 8px;
-  font-size: 13px;
-  font-weight: 700;
-  transition: box-shadow var(--duration-fast) var(--ease-standard);
+  flex-direction: column;
+  min-width: 0;
 }
 
-.sidebar-avatar:hover {
-  box-shadow: 0 0 0 2px var(--ring-color);
-}
-
-.sidebar-avatar__name {
-  font-size: 13px;
-  font-weight: 500;
+.user-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.sidebar--collapsed .sidebar-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 9999px;
-  justify-content: center;
-  padding: 0;
-}
-
-/* ── Mobile ────────────────────────────────────── */
-@media (max-width: 640px) {
-  .sidebar {
-    display: none;
-  }
+.user-role {
+  font-size: 9px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  font-weight: 600;
 }
 </style>

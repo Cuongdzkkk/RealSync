@@ -1,75 +1,143 @@
 :root {
-  /* ── SURFACES ──────────────────────────────────────────────── */
-  --color-canvas:         #FAFAFA;
-  --color-surface:        #FFFFFF;
-  --color-surface-hover:  #F5F5F5;
+  /* ─── LIGHT THEME (DEFAULT) ─────────────────────────────────── */
+  --color-canvas: #f8fafc;
+  --color-mesh-bg: radial-gradient(at 0% 0%, rgba(245, 230, 66, 0.1) 0px, transparent 50%),
+                    radial-gradient(at 50% 0%, rgba(14, 165, 233, 0.06) 0px, transparent 50%),
+                    radial-gradient(at 100% 100%, rgba(244, 63, 94, 0.04) 0px, transparent 50%);
+  
+  --color-surface: rgba(255, 255, 255, 0.7);
+  --color-surface-hover: rgba(241, 245, 249, 0.8);
+  --color-surface-glass: rgba(255, 255, 255, 0.45);
+  
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94a3b8;
+  
+  --color-border: rgba(148, 163, 184, 0.16);
+  --color-border-strong: rgba(148, 163, 184, 0.3);
+  --color-divider: rgba(148, 163, 184, 0.08);
 
-  /* ── TEXT ───────────────────────────────────────────────────── */
-  --color-text-primary:   #0D0D0D;
-  --color-text-secondary: #6B6B6B;
-  --color-text-muted:     #ABABAB;
+  /* Accent — Electric Yellow (RealSync Signature) */
+  --color-yellow: #facc15;
+  --color-yellow-hover: #eab308;
+  --color-yellow-muted: rgba(250, 204, 21, 0.12);
+  --color-yellow-text: #0f172a;
+  --color-yellow-glow: 0 0 16px rgba(250, 204, 21, 0.4);
 
-  /* ── BORDERS ───────────────────────────────────────────────── */
-  --color-border:         #E8E8E8;
-  --color-border-strong:  #D0D0D0;
-  --color-divider:        #F0F0F0;
+  /* Status Colors */
+  --color-success: #10b981;
+  --color-success-bg: rgba(16, 185, 129, 0.1);
+  --color-success-border: rgba(16, 185, 129, 0.2);
+  
+  --color-warning: #f59e0b;
+  --color-warning-bg: rgba(245, 158, 11, 0.1);
+  --color-warning-border: rgba(245, 158, 11, 0.2);
+  
+  --color-danger: #ef4444;
+  --color-danger-bg: rgba(239, 68, 68, 0.1);
+  --color-danger-border: rgba(239, 68, 68, 0.2);
+  
+  --color-info: #3b82f6;
+  --color-info-bg: rgba(59, 130, 246, 0.1);
+  --color-info-border: rgba(59, 130, 246, 0.2);
 
-  /* ── ACCENT — ELECTRIC YELLOW (ONE ONLY) ───────────────────── */
-  --color-yellow:         #F5E642;
-  --color-yellow-hover:   #EDD800;
-  --color-yellow-muted:   #FEFBCC;
-  --color-yellow-text:    #0D0D0D;
+  /* AI Center Colors */
+  --color-ai: #0ea5e9;
+  --color-ai-bg: rgba(14, 165, 233, 0.08);
+  --color-ai-border: rgba(14, 165, 233, 0.25);
+  --color-ai-glow: 0 0 16px rgba(14, 165, 233, 0.35);
 
-  /* ── METRIC CARD BACKGROUNDS ───────────────────────────────── */
-  --color-pastel-pink:    #F0D0DC;
-  --color-pastel-blue:    #D4E8F0;
-  --color-pastel-green:   #D4EDD8;
-  --color-pastel-peach:   #F0E0D0;
+  /* Sidebar styling */
+  --color-sidebar-bg: rgba(255, 255, 255, 0.4);
+  --color-sidebar-border: rgba(148, 163, 184, 0.16);
 
-  /* ── SEMANTIC STATUS ───────────────────────────────────────── */
-  --color-success:        #16A34A;
-  --color-success-bg:     #F0FDF4;
-  --color-success-border: #BBF7D0;
-  --color-warning:        #D97706;
-  --color-warning-bg:     #FFFBEB;
-  --color-danger:         #DC2626;
-  --color-danger-bg:      #FEF2F2;
-  --color-info:           #2563EB;
-  --color-info-bg:        #EFF6FF;
+  /* Fonts */
+  --font-ui: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
 
-  /* ── AI MODULE (restricted) ────────────────────────────────── */
-  --color-ai:             #0891B2;
-  --color-ai-bg:          #ECFEFF;
-  --color-ai-border:      #A5F3FC;
+  /* Elevations & Shadows */
+  --elevation-flat: none;
+  --elevation-surface: 0 1px 3px rgba(0, 0, 0, 0.02);
+  --elevation-raised: 0 4px 20px -2px rgba(148, 163, 184, 0.12), 0 2px 8px -1px rgba(148, 163, 184, 0.08);
+  --elevation-floating: 0 12px 32px -4px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.03);
 
-  /* ── TYPOGRAPHY ────────────────────────────────────────────── */
-  --font-ui:     'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  --font-mono:   'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace;
+  /* Motion */
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+  --duration-slow: 400ms;
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* ── ELEVATION ─────────────────────────────────────────────── */
-  --elevation-flat:    none;
-  --elevation-surface: 0 1px 3px rgba(0, 0, 0, 0.04);
-  --elevation-raised:  0 2px 12px rgba(0, 0, 0, 0.06);
-  --elevation-floating: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --ring-color: rgba(250, 204, 21, 0.35);
+  --ring-offset: 2px;
 
-  /* ── MOTION ────────────────────────────────────────────────── */
-  --duration-fast:   120ms;
-  --duration-base:   200ms;
-  --duration-slow:   350ms;
-  --ease-spring:     cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-standard:   cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
-
-  /* ── FOCUS ─────────────────────────────────────────────────── */
-  --ring-color:      rgba(245, 230, 66, 0.55);
-  --ring-offset:     2px;
-
-  /* ── Z-INDEX ───────────────────────────────────────────────── */
-  --z-base:    0;
-  --z-raised:  10;
+  --z-base: 0;
+  --z-raised: 10;
   --z-sidebar: 100;
-  --z-sticky:  200;
+  --z-sticky: 200;
   --z-overlay: 300;
-  --z-modal:   400;
-  --z-toast:   500;
+  --z-modal: 400;
+  --z-toast: 500;
+}
+
+/* ─── DARK THEME ────────────────────────────────────────────── */
+[data-theme="dark"], .dark {
+  --color-canvas: #030712;
+  --color-mesh-bg: radial-gradient(at 0% 0%, rgba(250, 204, 21, 0.06) 0px, transparent 50%),
+                    radial-gradient(at 50% 0%, rgba(14, 165, 233, 0.08) 0px, transparent 50%),
+                    radial-gradient(at 100% 100%, rgba(244, 63, 94, 0.03) 0px, transparent 50%),
+                    radial-gradient(at 50% 100%, rgba(2, 6, 23, 0.5) 0px, transparent 100%);
+
+  --color-surface: rgba(15, 23, 42, 0.65);
+  --color-surface-hover: rgba(30, 41, 59, 0.7);
+  --color-surface-glass: rgba(15, 23, 42, 0.4);
+
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+  --color-divider: rgba(255, 255, 255, 0.05);
+
+  /* Accent — Electric Yellow (RealSync Signature) */
+  --color-yellow: #facc15;
+  --color-yellow-hover: #eab308;
+  --color-yellow-muted: rgba(250, 204, 21, 0.08);
+  --color-yellow-text: #030712;
+  --color-yellow-glow: 0 0 20px rgba(250, 204, 21, 0.25);
+
+  /* Status Colors */
+  --color-success: #34d399;
+  --color-success-bg: rgba(52, 211, 153, 0.08);
+  --color-success-border: rgba(52, 211, 153, 0.15);
+
+  --color-warning: #fbbf24;
+  --color-warning-bg: rgba(251, 191, 36, 0.08);
+  --color-warning-border: rgba(251, 191, 36, 0.15);
+
+  --color-danger: #f87171;
+  --color-danger-bg: rgba(248, 113, 113, 0.08);
+  --color-danger-border: rgba(248, 113, 113, 0.15);
+
+  --color-info: #60a5fa;
+  --color-info-bg: rgba(96, 165, 250, 0.08);
+  --color-info-border: rgba(96, 165, 250, 0.15);
+
+  /* AI Center Colors */
+  --color-ai: #38bdf8;
+  --color-ai-bg: rgba(56, 189, 248, 0.08);
+  --color-ai-border: rgba(56, 189, 248, 0.2);
+  --color-ai-glow: 0 0 20px rgba(56, 189, 248, 0.25);
+
+  /* Sidebar styling */
+  --color-sidebar-bg: rgba(3, 7, 18, 0.5);
+  --color-sidebar-border: rgba(255, 255, 255, 0.08);
+
+  /* Elevations & Shadows */
+  --elevation-surface: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --elevation-raised: 0 4px 20px -2px rgba(0, 0, 0, 0.4), 0 2px 8px -1px rgba(0, 0, 0, 0.3);
+  --elevation-floating: 0 12px 32px -4px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+
+  --ring-color: rgba(250, 204, 21, 0.25);
 }

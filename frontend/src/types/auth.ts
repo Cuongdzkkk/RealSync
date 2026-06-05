@@ -7,7 +7,7 @@ export interface UserProfile {
   id: string;
   fullName: string;
   email: string;
-  role: 'Admin' | 'Manager' | 'Agent' | 'Viewer';
+  role: 'Admin' | 'Manager' | 'Sales' | 'Marketing' | 'Data Analyst' | 'Agent' | 'Viewer';
 }
 
 export interface AuthSession {

@@ -125,7 +125,8 @@ function selectCommand(cmd: Command) {
   cmd.action();
   emit('select', cmd);
   emit('close');
-}
+}//hihaha
+
 
 function onKeydown(e: KeyboardEvent) {
   const items = visibleCommands;
