@@ -294,23 +294,33 @@ function switchRole(role: typeof availableRoles[number]) {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  width: 150px;
+  width: 155px;
   display: flex;
   flex-direction: column;
   padding: 6px;
   z-index: var(--z-overlay);
+  background: rgba(255, 255, 255, 0.98) !important;
+  border: 1px solid var(--color-border-strong) !important;
+  box-shadow: var(--elevation-floating) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+[data-theme="dark"] .role-dropdown-menu,
+.dark .role-dropdown-menu {
+  background: rgba(15, 23, 42, 0.98) !important;
 }
 
 .dropdown-item {
   background: transparent;
   border: none;
   border-radius: 6px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   font-size: 12px;
   text-align: left;
   color: var(--color-text-secondary);
   cursor: pointer;
   transition: all var(--duration-fast);
+  font-weight: 500;
 }
 
 .dropdown-item:hover {
@@ -319,9 +329,9 @@ function switchRole(role: typeof availableRoles[number]) {
 }
 
 .dropdown-item.is-active {
-  background: var(--color-yellow-muted);
-  color: var(--color-yellow-hover);
-  font-weight: 600;
+  background: var(--color-yellow) !important;
+  color: var(--color-yellow-text) !important;
+  font-weight: 700;
 }
 
 /* CTA */

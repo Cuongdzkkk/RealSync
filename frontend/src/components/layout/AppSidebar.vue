@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -90,6 +90,19 @@ const navItems: NavItem[] = [
 const collapsed = computed(() => appStore.sidebarCollapsed);
 const currentRole = computed(() => authStore.user?.role ?? 'Guest');
 
+const showProfilePopup = ref(false);
+
+function goToSettings() {
+  showProfilePopup.value = false;
+  router.push('/admin/settings');
+}
+
+function handleLogout() {
+  showProfilePopup.value = false;
+  authStore.logout();
+  router.push('/login');
+}
+
 // Filter nav items based on user role
 const filteredNavItems = computed(() => {
   return navItems.filter(item => item.roles.includes(currentRole.value as any));
@@ -167,7 +180,55 @@ function navigateTo(to: string) {
         <span v-if="!collapsed">Thu gọn</span>
       </button>
 
-      <div class="sidebar-user-section">
+      <!-- Profile click-away backdrop overlay -->
+      <div v-if="showProfilePopup" class="profile-backdrop" @click="showProfilePopup = false"></div>
+
+      <!-- Floating profile popover -->
+      <div v-if="showProfilePopup" class="profile-popup glass-card animate-slide-up">
+        <div class="popup-header">
+          <div class="user-avatar glow-yellow large">
+            {{ authStore.user?.fullName?.charAt(0) ?? 'G' }}
+          </div>
+          <div class="popup-user-meta">
+            <h4>{{ authStore.user?.fullName ?? 'Guest' }}</h4>
+            <span class="popup-email">{{ authStore.user?.email ?? 'admin@realsync.vn' }}</span>
+          </div>
+        </div>
+
+        <div class="popup-divider"></div>
+
+        <div class="popup-body">
+          <div class="popup-info-item">
+            <span class="info-label">Vai trò</span>
+            <span class="info-val role-badge">{{ currentRole }}</span>
+          </div>
+          <div class="popup-info-item">
+            <span class="info-label">Trạng thái</span>
+            <span class="info-val status-badge active">Online</span>
+          </div>
+          <div class="popup-info-item">
+            <span class="info-label">Workspace</span>
+            <span class="info-val workspace-name">RealSync HQ</span>
+          </div>
+        </div>
+
+        <div class="popup-divider"></div>
+
+        <div class="popup-actions">
+          <button class="popup-action-btn" @click="goToSettings">
+            ⚙️ Cài đặt tài khoản
+          </button>
+          <button class="popup-action-btn danger" @click="handleLogout">
+            🚪 Đăng xuất
+          </button>
+        </div>
+      </div>
+
+      <div 
+        class="sidebar-user-section clickable-user"
+        :class="{ active: showProfilePopup }"
+        @click="showProfilePopup = !showProfilePopup"
+      >
         <div class="user-avatar glow-yellow">
           {{ authStore.user?.fullName?.charAt(0) ?? 'G' }}
         </div>
@@ -499,5 +560,151 @@ function navigateTo(to: string) {
   color: var(--color-text-muted);
   text-transform: uppercase;
   font-weight: 600;
+}
+
+.clickable-user {
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 8px;
+  transition: background-color var(--duration-fast);
+}
+
+.clickable-user:hover,
+.clickable-user.active {
+  background-color: var(--color-surface-hover);
+}
+
+.profile-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 999;
+  background: transparent;
+}
+
+.profile-popup {
+  position: absolute;
+  bottom: 64px;
+  left: 12px;
+  width: calc(100% - 24px);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: var(--elevation-floating);
+  z-index: 1000;
+  border: 1px solid var(--color-border);
+}
+
+.sidebar--collapsed .profile-popup {
+  left: 68px;
+  bottom: 16px;
+  width: 240px;
+}
+
+.popup-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-avatar.large {
+  width: 44px;
+  height: 44px;
+  font-size: 16px;
+}
+
+.popup-user-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.popup-user-meta h4 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.popup-email {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.popup-divider {
+  height: 1px;
+  background-color: var(--color-divider);
+}
+
+.popup-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.popup-info-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.info-label {
+  color: var(--color-text-muted);
+}
+
+.info-val {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.info-val.role-badge {
+  color: var(--color-yellow-hover);
+  text-transform: uppercase;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.info-val.status-badge {
+  color: var(--color-success);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.popup-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.popup-action-btn {
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-glass);
+  color: var(--color-text-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all var(--duration-fast);
+}
+
+.popup-action-btn:hover {
+  background-color: var(--color-surface-hover);
+}
+
+.popup-action-btn.danger {
+  color: var(--color-danger);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.popup-action-btn.danger:hover {
+  background-color: rgba(239, 68, 68, 0.08);
 }
 </style>

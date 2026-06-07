@@ -669,6 +669,7 @@ function generateAiScript(lead: Lead) {
   border-bottom: 1px solid var(--color-border);
   padding: 14px 18px;
   text-align: left;
+  white-space: nowrap;
 }
 
 .leads-table td {
@@ -735,6 +736,8 @@ function generateAiScript(lead: Lead) {
   padding: 2px 8px;
   border-radius: 6px;
   text-transform: uppercase;
+  white-space: nowrap;
+  display: inline-block;
 }
 .stage-tag.new { background-color: var(--color-surface-hover); color: var(--color-text-secondary); border: 1px solid var(--color-border); }
 .stage-tag.contacted { background-color: var(--color-info-bg); color: var(--color-info); border: 1px solid var(--color-info-border); }
