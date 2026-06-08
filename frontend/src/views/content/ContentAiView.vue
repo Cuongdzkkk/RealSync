@@ -4,6 +4,7 @@ import { usePropertyStore } from '@/stores/usePropertyStore';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { mockAiContents } from '@/utils/mockData';
+import RoleGate from '@/components/common/RoleGate.vue';
 
 const propertyStore = usePropertyStore();
 const projectStore = useProjectStore();
@@ -121,8 +122,9 @@ const historyList = ref(mockAiContents);
 </script>
 
 <template>
-  <div class="page">
-    <div class="workspace-grid">
+  <RoleGate :roles="['Admin', 'Sales', 'Marketing']">
+    <div class="page">
+      <div class="workspace-grid">
       <!-- Left Controls Panel -->
       <div class="panel-controls glass-card">
         <div class="panel-header">
@@ -380,6 +382,7 @@ const historyList = ref(mockAiContents);
       </table>
     </div>
   </div>
+  </RoleGate>
 </template>
 
 <style scoped>

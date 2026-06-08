@@ -5,6 +5,7 @@ import { usePropertyStore } from '@/stores/usePropertyStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { mockAiJobs } from '@/utils/mockData';
 import { formatCurrency } from '@/utils/format';
+import RoleGate from '@/components/common/RoleGate.vue';
 
 const leadStore = useLeadStore();
 const propertyStore = usePropertyStore();
@@ -131,9 +132,10 @@ const jobsList = ref(mockAiJobs);
 </script>
 
 <template>
-  <div class="page">
-    <!-- Header Summary Metrics -->
-    <div class="metrics-row">
+  <RoleGate :roles="['Admin', 'Manager', 'Sales']">
+    <div class="page">
+      <!-- Header Summary Metrics -->
+      <div class="metrics-row">
       <div class="metric-card glass-card">
         <span class="label">Tổng số bản ghi đã phân loại</span>
         <strong class="value numeric">1,482</strong>
@@ -332,6 +334,7 @@ const jobsList = ref(mockAiJobs);
       </div>
     </div>
   </div>
+  </RoleGate>
 </template>
 
 <style scoped>
