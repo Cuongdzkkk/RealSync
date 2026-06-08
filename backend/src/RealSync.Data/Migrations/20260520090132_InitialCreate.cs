@@ -1,11 +1,15 @@
 ﻿using System;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using RealSync.Data.Context;
 
 #nullable disable
 
 namespace RealSync.Data.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(RealSyncDbContext))]
+    [Migration("20260520090132_InitialCreate")]
     public partial class InitialCreate : Migration
     {
         /// <inheritdoc />

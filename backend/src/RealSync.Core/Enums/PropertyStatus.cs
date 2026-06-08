@@ -9,5 +9,7 @@ public enum PropertyStatus
     Active = 1,
     Sold = 2,
     Rented = 3,
-    Expired = 4
+    Expired = 4,
+    Available = 5,
+    Hidden = 6
 }

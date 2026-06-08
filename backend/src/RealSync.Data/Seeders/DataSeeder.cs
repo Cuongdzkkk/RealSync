@@ -13,6 +13,7 @@ public static class DataSeeder
     public static async Task SeedAsync(RealSyncDbContext context)
     {
         await SeedRolesAsync(context);
+        await SeedPropertyCategoriesAsync(context);
         await SeedPropertyTypesAsync(context);
         await SeedAreasAsync(context);
         await SeedPermissionsAsync(context);
@@ -42,17 +43,31 @@ public static class DataSeeder
 
         var types = new[]
         {
-            new PropertyType { Name = "Đất nền", Description = "Đất nền dự án, đất thổ cư", SortOrder = 1 },
-            new PropertyType { Name = "Nhà phố", Description = "Nhà phố, nhà mặt tiền", SortOrder = 2 },
-            new PropertyType { Name = "Căn hộ", Description = "Căn hộ chung cư", SortOrder = 3 },
-            new PropertyType { Name = "Biệt thự", Description = "Biệt thự, villa", SortOrder = 4 },
-            new PropertyType { Name = "Nhà riêng", Description = "Nhà riêng, nhà trong hẻm", SortOrder = 5 },
-            new PropertyType { Name = "Shophouse", Description = "Nhà phố thương mại", SortOrder = 6 },
-            new PropertyType { Name = "Penthouse", Description = "Căn hộ penthouse", SortOrder = 7 },
-            new PropertyType { Name = "Đất nông nghiệp", Description = "Đất nông nghiệp, đất trồng cây", SortOrder = 8 },
+            new PropertyType { Name = "Đất nền", Slug = "dat-nen", Description = "Đất nền dự án, đất thổ cư", SortOrder = 1 },
+            new PropertyType { Name = "Nhà phố", Slug = "nha-pho", Description = "Nhà phố, nhà mặt tiền", SortOrder = 2 },
+            new PropertyType { Name = "Căn hộ", Slug = "can-ho", Description = "Căn hộ chung cư", SortOrder = 3 },
+            new PropertyType { Name = "Biệt thự", Slug = "biet-thu", Description = "Biệt thự, villa", SortOrder = 4 },
+            new PropertyType { Name = "Nhà riêng", Slug = "nha-rieng", Description = "Nhà riêng, nhà trong hẻm", SortOrder = 5 },
+            new PropertyType { Name = "Shophouse", Slug = "shophouse", Description = "Nhà phố thương mại", SortOrder = 6 },
+            new PropertyType { Name = "Penthouse", Slug = "penthouse", Description = "Căn hộ penthouse", SortOrder = 7 },
+            new PropertyType { Name = "Đất nông nghiệp", Slug = "dat-nong-nghiep", Description = "Đất nông nghiệp, đất trồng cây", SortOrder = 8 },
         };
 
         context.PropertyTypes.AddRange(types);
+    }
+
+    private static async Task SeedPropertyCategoriesAsync(RealSyncDbContext context)
+    {
+        if (await context.PropertyCategories.AnyAsync()) return;
+
+        var categories = new[]
+        {
+            new PropertyCategory { Name = "Nhà đất bán", Slug = "nha-dat-ban", Description = "Bất động sản đang chào bán" },
+            new PropertyCategory { Name = "Nhà đất cho thuê", Slug = "nha-dat-cho-thue", Description = "Bất động sản đang cho thuê" },
+            new PropertyCategory { Name = "Dự án", Slug = "du-an", Description = "Sản phẩm thuộc dự án bất động sản" },
+        };
+
+        context.PropertyCategories.AddRange(categories);
     }
 
     private static async Task SeedAreasAsync(RealSyncDbContext context)
@@ -174,8 +189,6 @@ public static class DataSeeder
 
     private static async Task SeedAdminUserAsync(RealSyncDbContext context)
     {
-        if (await context.Users.AnyAsync()) return;
-
         var adminRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Admin");
         var managerRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Manager");
         var agentRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Agent");
@@ -223,6 +236,12 @@ public static class DataSeeder
             },
         };
 
-        context.Users.AddRange(users);
+        var seedEmails = users.Select(seedUser => seedUser.Email).ToArray();
+        var existingEmails = await context.Users
+            .Where(u => seedEmails.Contains(u.Email))
+            .Select(u => u.Email)
+            .ToListAsync();
+
+        context.Users.AddRange(users.Where(u => !existingEmails.Contains(u.Email)));
     }
 }

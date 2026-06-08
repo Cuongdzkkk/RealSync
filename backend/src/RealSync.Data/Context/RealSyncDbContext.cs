@@ -28,6 +28,7 @@ public class RealSyncDbContext : DbContext
 
     // Core
     public DbSet<Property> Properties => Set<Property>();
+    public DbSet<PropertyCategory> PropertyCategories => Set<PropertyCategory>();
     public DbSet<PropertyType> PropertyTypes => Set<PropertyType>();
     public DbSet<PropertyImage> PropertyImages => Set<PropertyImage>();
     public DbSet<Project> Projects => Set<Project>();
