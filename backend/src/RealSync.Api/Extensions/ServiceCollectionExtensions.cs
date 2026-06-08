@@ -38,6 +38,13 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IPropertyService, PropertyService>();
 
+        // Posting services
+        services.AddScoped<IPostService, PostService>();
+        services.AddScoped<IPostChannelService, PostChannelService>();
+        services.AddScoped<IPostAnalyticsService, PostAnalyticsService>();
+        services.AddScoped<IPostScheduleService, PostScheduleService>();
+        services.AddScoped<IAIContentService, AIContentService>();
+
 
         // FluentValidation — auto-scan tất cả validators từ Shared assembly
         services.AddValidatorsFromAssemblyContaining<RealSync.Shared.Validators.Auth.LoginRequestValidator>();

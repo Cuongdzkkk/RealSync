@@ -45,14 +45,14 @@ jobs:
     # Bước 4: Restore
     - name: Khôi phục thư viện (Restore dependencies)
       run: dotnet restore
-      working-directory: ./Backend
+      working-directory: ./backend
 
     # Bước 5: Build
     - name: Biên dịch dự án (Build)
       run: dotnet build --no-restore --configuration Release
-      working-directory: ./Backend
+      working-directory: ./backend
 
     # Bước 6: Test
     - name: Chạy Unit Tests
       run: dotnet test --no-build --verbosity normal --configuration Release
-      working-directory: ./Backend
+      working-directory: ./backend
