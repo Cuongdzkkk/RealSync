@@ -22,4 +22,5 @@ public class User : BaseEntity
     public ICollection<Customer> AssignedCustomers { get; set; } = new List<Customer>();
     public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
     public ICollection<ActivityLog> ActivityLogs { get; set; } = new List<ActivityLog>();
+    public ICollection<Post> Posts { get; set; } = new List<Post>();
 }

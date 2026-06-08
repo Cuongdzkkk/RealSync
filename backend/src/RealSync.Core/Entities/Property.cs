@@ -55,4 +55,5 @@ public class Property : BaseEntity
 
     // Navigation
     public ICollection<PropertyImage> Images { get; set; } = new List<PropertyImage>();
+    public ICollection<Post> Posts { get; set; } = new List<Post>();
 }

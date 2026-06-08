@@ -34,6 +34,7 @@
 | **AI Classification** | Phân loại, gợi ý, scoring tự động |
 | **Content AI Engine** | Sinh nội dung BĐS bằng AI |
 | **Dashboard & Insight** | Báo cáo, phân tích, KPI |
+| **Posting Management** | Quản lý đăng bài BĐS đa kênh |
 | **DevOps/Deploy** | CI/CD, monitoring, infrastructure |
 
 ---
