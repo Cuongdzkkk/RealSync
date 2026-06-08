@@ -12,14 +12,16 @@ public class Property : BaseEntity
     public string? Description { get; set; }
 
     // Type & Project
+    public Guid? PropertyCategoryId { get; set; }
+    public PropertyCategory? PropertyCategory { get; set; }
     public Guid PropertyTypeId { get; set; }
     public PropertyType PropertyType { get; set; } = null!;
     public Guid? ProjectId { get; set; }
     public Project? Project { get; set; }
 
     // Location
-    public Guid AreaId { get; set; }
-    public Area Area { get; set; } = null!;
+    public Guid? AreaId { get; set; }
+    public Area? Area { get; set; }
     public string? Address { get; set; }
     public string? Ward { get; set; }
     public string? District { get; set; }
@@ -28,8 +30,8 @@ public class Property : BaseEntity
     public decimal? Longitude { get; set; }
 
     // Specs
-    public decimal? Area_ { get; set; }  // Diện tích (m²) — tên tránh conflict với navigation
-    public decimal? Price { get; set; }
+    public decimal Area_ { get; set; }  // Diện tích (m²) — tên tránh conflict với navigation
+    public decimal Price { get; set; }
     public string? PriceUnit { get; set; } = "VND";
     public int Bedrooms { get; set; } = 0;
     public int Bathrooms { get; set; } = 0;

@@ -22,10 +22,10 @@ public class PropertyConfiguration : IEntityTypeConfiguration<Property>
 
         builder.Property(e => e.Title)
             .IsRequired()
-            .HasMaxLength(500);
+            .HasMaxLength(200);
 
         builder.Property(e => e.Description)
-            .HasColumnType("nvarchar(max)");
+            .HasMaxLength(4000);
 
         // Location
         builder.Property(e => e.Address).HasMaxLength(500);
@@ -38,10 +38,12 @@ public class PropertyConfiguration : IEntityTypeConfiguration<Property>
         // Specs — map Area_ property to "Area" column
         builder.Property(e => e.Area_)
             .HasColumnName("Area")
-            .HasColumnType("decimal(18,2)");
+            .HasColumnType("decimal(18,2)")
+            .IsRequired();
 
         builder.Property(e => e.Price)
-            .HasColumnType("decimal(18,0)");
+            .HasColumnType("decimal(18,2)")
+            .IsRequired();
 
         builder.Property(e => e.PriceUnit)
             .HasMaxLength(20)
@@ -69,6 +71,11 @@ public class PropertyConfiguration : IEntityTypeConfiguration<Property>
         builder.Property(e => e.MetaDescription).HasMaxLength(500);
 
         // Relationships
+        builder.HasOne(e => e.PropertyCategory)
+            .WithMany(c => c.Properties)
+            .HasForeignKey(e => e.PropertyCategoryId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne(e => e.PropertyType)
             .WithMany(pt => pt.Properties)
             .HasForeignKey(e => e.PropertyTypeId)
@@ -91,9 +98,11 @@ public class PropertyConfiguration : IEntityTypeConfiguration<Property>
 
         // Indexes
         builder.HasIndex(e => e.PropertyCode).IsUnique();
+        builder.HasIndex(e => e.Title);
         builder.HasIndex(e => e.Slug).IsUnique()
             .HasFilter("[Slug] IS NOT NULL");
         builder.HasIndex(e => e.Status);
+        builder.HasIndex(e => e.PropertyCategoryId);
         builder.HasIndex(e => e.PropertyTypeId);
         builder.HasIndex(e => e.AreaId);
         builder.HasIndex(e => e.Price);

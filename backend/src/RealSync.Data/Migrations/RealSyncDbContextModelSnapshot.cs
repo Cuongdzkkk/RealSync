@@ -765,10 +765,10 @@ namespace RealSync.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
-                    b.Property<Guid>("AreaId")
+                    b.Property<Guid?>("AreaId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<decimal?>("Area_")
+                    b.Property<decimal>("Area_")
                         .HasColumnType("decimal(18,2)")
                         .HasColumnName("Area");
 
@@ -791,7 +791,8 @@ namespace RealSync.Data.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
 
                     b.Property<string>("Direction")
                         .HasMaxLength(20)
@@ -835,8 +836,8 @@ namespace RealSync.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
-                    b.Property<decimal?>("Price")
-                        .HasColumnType("decimal(18,0)");
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("PriceUnit")
                         .ValueGeneratedOnAdd()
@@ -845,6 +846,9 @@ namespace RealSync.Data.Migrations
                         .HasDefaultValue("VND");
 
                     b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("PropertyCategoryId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("PropertyCode")
@@ -880,8 +884,8 @@ namespace RealSync.Data.Migrations
 
                     b.Property<string>("Title")
                         .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -907,6 +911,8 @@ namespace RealSync.Data.Migrations
 
                     b.HasIndex("ProjectId");
 
+                    b.HasIndex("PropertyCategoryId");
+
                     b.HasIndex("PropertyCode")
                         .IsUnique();
 
@@ -918,7 +924,65 @@ namespace RealSync.Data.Migrations
 
                     b.HasIndex("Status");
 
+                    b.HasIndex("Title");
+
                     b.ToTable("Properties", (string)null);
+                });
+
+            modelBuilder.Entity("RealSync.Core.Entities.PropertyCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("PropertyCategories", (string)null);
                 });
 
             modelBuilder.Entity("RealSync.Core.Entities.PropertyImage", b =>
@@ -931,6 +995,11 @@ namespace RealSync.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -940,14 +1009,35 @@ namespace RealSync.Data.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
                     b.Property<bool>("IsPrimary")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsThumbnail")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
                     b.Property<Guid>("PropertyId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("bigint");
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");
@@ -966,6 +1056,8 @@ namespace RealSync.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("PropertyId");
+
+                    b.HasIndex("PropertyId", "IsThumbnail");
 
                     b.ToTable("PropertyImages", (string)null);
                 });
@@ -1004,6 +1096,10 @@ namespace RealSync.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("Slug")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");
 
@@ -1017,6 +1113,10 @@ namespace RealSync.Data.Migrations
 
                     b.HasIndex("Name")
                         .IsUnique();
+
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasFilter("[Slug] IS NOT NULL");
 
                     b.ToTable("PropertyTypes", (string)null);
                 });
@@ -1270,8 +1370,7 @@ namespace RealSync.Data.Migrations
                     b.HasOne("RealSync.Core.Entities.Area", "Area")
                         .WithMany("Properties")
                         .HasForeignKey("AreaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("RealSync.Core.Entities.CrawlJob", "CrawlJob")
                         .WithMany("Properties")
@@ -1281,6 +1380,11 @@ namespace RealSync.Data.Migrations
                     b.HasOne("RealSync.Core.Entities.Project", "Project")
                         .WithMany("Properties")
                         .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("RealSync.Core.Entities.PropertyCategory", "PropertyCategory")
+                        .WithMany("Properties")
+                        .HasForeignKey("PropertyCategoryId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("RealSync.Core.Entities.PropertyType", "PropertyType")
@@ -1294,6 +1398,8 @@ namespace RealSync.Data.Migrations
                     b.Navigation("CrawlJob");
 
                     b.Navigation("Project");
+
+                    b.Navigation("PropertyCategory");
 
                     b.Navigation("PropertyType");
                 });
@@ -1376,6 +1482,11 @@ namespace RealSync.Data.Migrations
             modelBuilder.Entity("RealSync.Core.Entities.Property", b =>
                 {
                     b.Navigation("Images");
+                });
+
+            modelBuilder.Entity("RealSync.Core.Entities.PropertyCategory", b =>
+                {
+                    b.Navigation("Properties");
                 });
 
             modelBuilder.Entity("RealSync.Core.Entities.PropertyType", b =>
