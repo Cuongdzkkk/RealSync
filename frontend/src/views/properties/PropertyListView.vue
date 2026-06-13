@@ -1,983 +1,784 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { usePropertyStore } from '@/stores/usePropertyStore';
-import { useToastStore } from '@/stores/useToastStore';
-import type { Property, PropertyStatus } from '@/types/property';
-import { PROPERTY_STATUSES } from '@/utils/constants';
-import { formatCurrency } from '@/utils/format';
-import PropertyCard from '@/components/property/PropertyCard.vue';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { Delete, Edit, Plus, Refresh, Search, View as ViewIcon } from '@element-plus/icons-vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
 
-const propertyStore = usePropertyStore();
-const toastStore = useToastStore();
+import PropertyAnalytics from '@/components/property/PropertyAnalytics.vue';
+import { propertyService } from '@/services/propertyService';
+import { useAuthStore } from '@/stores/useAuthStore';
+import type { LocationOption, Property, PropertyCategory, PropertyQuery, PropertyType } from '@/types/property';
+import { formatCurrency, formatDate, formatNumber } from '@/utils/format';
 
-// --- Filter States ---
-const searchQuery = ref('');
-const selectedSource = ref<string>('all');
-const selectedStatus = ref<string>('all');
+const router = useRouter();
+const authStore = useAuthStore();
 
-// --- Drawer & Modal States ---
-const activeDetailProperty = ref<Property | null>(null);
-const showFormModal = ref(false);
-const editingProperty = ref<Property | null>(null);
+const properties = ref<Property[]>([]);
+const categories = ref<PropertyCategory[]>([]);
+const propertyTypes = ref<PropertyType[]>([]);
+const provinces = ref<LocationOption[]>([]);
+const districts = ref<LocationOption[]>([]);
+const wards = ref<LocationOption[]>([]);
+const loading = ref(false);
+const optionsLoading = ref(false);
+const errorMessage = ref('');
+const total = ref(0);
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
-// --- Form State ---
-const formTitle = computed(() => editingProperty.value ? 'Cập nhật Bất động sản' : 'Thêm Bất động sản mới');
-const formProp = ref({
-  title: '',
-  address: '',
-  area: 'TP. Thủ Đức',
-  price: 0,
-  acreage: 0,
-  bedrooms: 1,
-  status: 'verified' as PropertyStatus,
-  source: 'internal',
-  imageUrl: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=900&q=80',
-  aiScore: 85
+const query = reactive<PropertyQuery>({
+  page: 1,
+  pageSize: 10,
+  search: '',
+  minPrice: null,
+  maxPrice: null,
+  minArea: null,
+  maxArea: null,
+  provinceId: null,
+  districtId: null,
+  wardId: null,
+  categoryId: null,
+  typeId: null,
+  status: null,
+  sortBy: 'createdAt',
+  sortDirection: 'desc'
 });
 
-// Computed filtered items
-const filteredProperties = computed(() => {
-  return propertyStore.items.filter(prop => {
-    const matchesSearch = prop.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                          prop.address.toLowerCase().includes(searchQuery.value.toLowerCase());
-    const matchesSource = selectedSource.value === 'all' || prop.source === selectedSource.value;
-    const matchesStatus = selectedStatus.value === 'all' || prop.status === selectedStatus.value;
-    return matchesSearch && matchesSource && matchesStatus;
+const canMutate = computed(() => {
+  const role = authStore.user?.role;
+  return Boolean(role && ['Admin', 'Manager', 'Marketing'].includes(role));
+});
+
+const statusOptions = [
+  { label: 'Draft', value: 'Draft' },
+  { label: 'Active', value: 'Active' },
+  { label: 'Available', value: 'Available' },
+  { label: 'Sold', value: 'Sold' },
+  { label: 'Rented', value: 'Rented' },
+  { label: 'Expired', value: 'Expired' },
+  { label: 'Hidden', value: 'Hidden' }
+];
+
+const sortOptions = [
+  { label: 'Ngày tạo', value: 'createdAt' },
+  { label: 'Giá', value: 'price' },
+  { label: 'Diện tích', value: 'area' },
+  { label: 'Tiêu đề', value: 'title' }
+];
+
+const fallbackImage =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="480" height="320" viewBox="0 0 480 320"><rect width="480" height="320" fill="%23f8fafc"/><rect x="96" y="78" width="288" height="164" rx="14" fill="%23e2e8f0"/><path d="M145 214l58-64 42 42 28-30 62 52H145z" fill="%2394a3b8"/><circle cx="305" cy="127" r="20" fill="%23cbd5e1"/></svg>';
+
+function getErrorMessage(error: any) {
+  if (error?.response?.status === 403) {
+    return 'Bạn không có quyền thực hiện thao tác này.';
+  }
+
+  return error?.response?.data?.message ?? 'Không tải được dữ liệu bất động sản.';
+}
+
+function getThumbnail(property: Property) {
+  return property.imageUrl || property.images?.find((image) => image.isThumbnail)?.url || property.images?.[0]?.url || fallbackImage;
+}
+
+function handleImageError(event: Event) {
+  const target = event.target as HTMLImageElement;
+  target.src = fallbackImage;
+}
+
+function getStatusLabel(status: string) {
+  const map: Record<string, string> = {
+    draft: 'Draft',
+    active: 'Active',
+    available: 'Available',
+    sold: 'Sold',
+    rented: 'Rented',
+    expired: 'Expired',
+    hidden: 'Hidden',
+    verified: 'Đã duyệt',
+    published: 'Đã đăng'
+  };
+
+  return map[status.toLowerCase()] ?? status;
+}
+
+function getStatusClass(status: string) {
+  return `status-${status.toLowerCase()}`;
+}
+
+function getCategoryText(property: Property) {
+  const category = property.categoryName ?? property.propertyCategoryName ?? 'Chưa phân loại';
+  const type = property.typeName ?? property.propertyTypeName;
+  return type ? `${category} / ${type}` : category;
+}
+
+function getLocationText(property: Property) {
+  const location = [property.wardName, property.districtName, property.provinceName].filter(Boolean).join(', ');
+  return location || property.address || '-';
+}
+
+async function loadOptions() {
+  optionsLoading.value = true;
+  try {
+    const [categoryItems, typeItems, provinceItems] = await Promise.all([
+      propertyService.getPropertyCategories(),
+      propertyService.getPropertyTypes(),
+      propertyService.getProvinces()
+    ]);
+
+    categories.value = categoryItems.filter((item) => item.isActive);
+    propertyTypes.value = typeItems.filter((item) => item.isActive);
+    provinces.value = provinceItems.filter((item) => item.isActive);
+  } catch {
+    ElMessage.error('Không tải được danh mục hoặc khu vực lọc.');
+  } finally {
+    optionsLoading.value = false;
+  }
+}
+
+async function loadProperties() {
+  loading.value = true;
+  errorMessage.value = '';
+
+  try {
+    const response = await propertyService.getProperties(query);
+    properties.value = response.data;
+    total.value = response.meta?.totalCount ?? response.data.length;
+  } catch (error: any) {
+    errorMessage.value = getErrorMessage(error);
+  } finally {
+    loading.value = false;
+  }
+}
+
+function applyFilters() {
+  query.page = 1;
+  loadProperties();
+}
+
+function handleSearchInput() {
+  if (searchTimer) {
+    clearTimeout(searchTimer);
+  }
+
+  searchTimer = setTimeout(() => {
+    applyFilters();
+  }, 350);
+}
+
+async function handleProvinceChange(value: string | null) {
+  query.districtId = null;
+  query.wardId = null;
+  districts.value = [];
+  wards.value = [];
+
+  if (value) {
+    districts.value = (await propertyService.getDistricts(value)).filter((item) => item.isActive);
+  }
+
+  applyFilters();
+}
+
+async function handleDistrictChange(value: string | null) {
+  query.wardId = null;
+  wards.value = [];
+
+  if (value) {
+    wards.value = (await propertyService.getWards(value)).filter((item) => item.isActive);
+  }
+
+  applyFilters();
+}
+
+function resetFilters() {
+  Object.assign(query, {
+    page: 1,
+    pageSize: query.pageSize,
+    search: '',
+    minPrice: null,
+    maxPrice: null,
+    minArea: null,
+    maxArea: null,
+    provinceId: null,
+    districtId: null,
+    wardId: null,
+    categoryId: null,
+    typeId: null,
+    status: null,
+    sortBy: 'createdAt',
+    sortDirection: 'desc'
   });
-});
-
-// AI Valuation Simulator
-const aiValuation = computed(() => {
-  if (!activeDetailProperty.value) return 0;
-  // Simulates market price estimation (usually within +- 5% of actual price)
-  const hash = activeDetailProperty.value.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const factor = 0.95 + ((hash % 10) / 100); // 0.95 to 1.04
-  return Math.round(activeDetailProperty.value.price * factor);
-});
-
-const priceDiffPercent = computed(() => {
-  if (!activeDetailProperty.value) return '0%';
-  const diff = (activeDetailProperty.value.price - aiValuation.value) / aiValuation.value * 100;
-  return `${diff > 0 ? '+' : ''}${diff.toFixed(1)}%`;
-});
-
-// Open/Close Actions
-function openDetail(id: string) {
-  const item = propertyStore.items.find(p => p.id === id);
-  if (item) {
-    activeDetailProperty.value = item;
-  }
+  districts.value = [];
+  wards.value = [];
+  loadProperties();
 }
 
-function closeDetail() {
-  activeDetailProperty.value = null;
+function handlePageChange(page: number) {
+  query.page = page;
+  loadProperties();
 }
 
-function openAddModal() {
-  editingProperty.value = null;
-  formProp.value = {
-    title: '',
-    address: '',
-    area: 'TP. Thủ Đức',
-    price: 0,
-    acreage: 0,
-    bedrooms: 2,
-    status: 'verified',
-    source: 'internal',
-    imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=900&q=80',
-    aiScore: 85
-  };
-  showFormModal.value = true;
+function handlePageSizeChange(pageSize: number) {
+  query.pageSize = pageSize;
+  query.page = 1;
+  loadProperties();
 }
 
-function openEditModal(prop: Property) {
-  editingProperty.value = prop;
-  formProp.value = {
-    title: prop.title,
-    address: prop.address,
-    area: prop.area,
-    price: prop.price,
-    acreage: prop.acreage,
-    bedrooms: prop.bedrooms,
-    status: prop.status,
-    source: prop.source,
-    imageUrl: prop.imageUrl,
-    aiScore: prop.aiScore
-  };
-  showFormModal.value = true;
-}
+async function deleteProperty(property: Property) {
+  if (!canMutate.value) return;
 
-function saveProperty() {
-  if (!formProp.value.title || !formProp.value.address || formProp.value.price <= 0) {
-    toastStore.warning('Thiếu thông tin', 'Vui lòng điền tiêu đề, địa chỉ và giá trị bất động sản.');
-    return;
-  }
+  try {
+    await ElMessageBox.confirm(
+      `Xóa bất động sản "${property.title}"? Hành động này không thể hoàn tác.`,
+      'Xác nhận xóa',
+      {
+        confirmButtonText: 'Xóa',
+        cancelButtonText: 'Hủy',
+        type: 'warning'
+      }
+    );
 
-  if (editingProperty.value) {
-    const updated: Property = {
-      ...editingProperty.value,
-      ...formProp.value
-    };
-    propertyStore.updateProperty(updated);
-    toastStore.success('Thành công', `Đã cập nhật bất động sản: ${formProp.value.title}`);
-  } else {
-    const created: Property = {
-      id: `p-${Date.now()}`,
-      ...formProp.value,
-      createdAt: new Date().toISOString()
-    };
-    propertyStore.addProperty(created);
-    toastStore.success('Thành công', `Đã thêm bất động sản mới: ${formProp.value.title}`);
-  }
-  showFormModal.value = false;
-}
+    await propertyService.deleteProperty(property.id);
+    ElMessage.success('Đã xóa bất động sản.');
 
-function deletePropertyItem(id: string) {
-  if (confirm('Bạn chắc chắn muốn xóa tin đăng bất động sản này?')) {
-    propertyStore.deleteProperty(id);
-    toastStore.success('Đã xóa', 'Tin đăng bất động sản đã được xóa khỏi hệ thống.');
-    if (activeDetailProperty.value?.id === id) {
-      activeDetailProperty.value = null;
+    if (properties.value.length === 1 && query.page > 1) {
+      query.page -= 1;
     }
+
+    await loadProperties();
+  } catch (error: any) {
+    if (error === 'cancel') return;
+    ElMessage.error(getErrorMessage(error));
   }
 }
 
-const fileInput = ref<HTMLInputElement | null>(null);
-
-function handleFileUpload(event: Event) {
-  const target = event.target as HTMLInputElement;
-  const file = target.files?.[0];
-  if (!file) return;
-
-  if (!file.type.startsWith('image/')) {
-    toastStore.warning('Sai định dạng', 'Vui lòng chọn một file hình ảnh.');
-    return;
-  }
-
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    if (e.target?.result) {
-      formProp.value.imageUrl = e.target.result as string;
-      toastStore.success('Tải ảnh thành công', 'Ảnh đã được nạp làm hình nền của sản phẩm BĐS.');
-    }
-  };
-  reader.readAsDataURL(file);
-}
+onMounted(async () => {
+  await Promise.all([loadOptions(), loadProperties()]);
+});
 </script>
 
 <template>
-  <div class="page">
-    <!-- Header Section -->
-    <div class="properties-header glass-card">
-      <div class="header-main">
-        <div>
-          <h2>Kho Bất động sản</h2>
-          <p class="subtitle-text">Hệ thống kho hàng tổng hợp từ nguồn Crawler tự động và tin đăng nội bộ của RealSync.</p>
-        </div>
-        <button class="add-prop-btn glow-yellow" @click="openAddModal">
-          + Thêm sản phẩm BĐS
-        </button>
+  <section class="property-page">
+    <header class="property-header">
+      <div>
+        <h1>Properties</h1>
+        <p>Quản lý danh sách bất động sản</p>
+      </div>
+      <div class="property-header__actions">
+        <el-button :icon="Refresh" :loading="loading" @click="loadProperties">Refresh</el-button>
+        <el-button v-if="canMutate" class="primary-action" @click="router.push({ name: 'property-create' })">
+          <el-icon><Plus /></el-icon>
+          <span>Add Property</span>
+        </el-button>
+      </div>
+    </header>
+
+    <PropertyAnalytics :properties="properties" :total="total" :loading="loading && properties.length === 0" />
+
+    <section class="filter-card" v-loading="optionsLoading">
+      <el-input
+        v-model="query.search"
+        clearable
+        placeholder="Search title, code, address..."
+        @input="handleSearchInput"
+        @clear="applyFilters"
+        @keyup.enter="applyFilters"
+      >
+        <template #prefix>
+          <el-icon><Search /></el-icon>
+        </template>
+      </el-input>
+
+      <el-select v-model="query.categoryId" clearable filterable placeholder="Category" @change="applyFilters">
+        <el-option v-for="item in categories" :key="item.id" :label="item.name" :value="item.id" />
+      </el-select>
+
+      <el-select v-model="query.typeId" clearable filterable placeholder="Type" @change="applyFilters">
+        <el-option v-for="item in propertyTypes" :key="item.id" :label="item.name" :value="item.id" />
+      </el-select>
+
+      <el-select v-model="query.provinceId" clearable filterable placeholder="Province" @change="handleProvinceChange">
+        <el-option v-for="item in provinces" :key="item.id" :label="item.name" :value="item.id" />
+      </el-select>
+
+      <el-select
+        v-model="query.districtId"
+        clearable
+        filterable
+        placeholder="District"
+        :disabled="!query.provinceId"
+        @change="handleDistrictChange"
+      >
+        <el-option v-for="item in districts" :key="item.id" :label="item.name" :value="item.id" />
+      </el-select>
+
+      <el-select
+        v-model="query.wardId"
+        clearable
+        filterable
+        placeholder="Ward"
+        :disabled="!query.districtId"
+        @change="applyFilters"
+      >
+        <el-option v-for="item in wards" :key="item.id" :label="item.name" :value="item.id" />
+      </el-select>
+
+      <el-select v-model="query.status" clearable placeholder="Status" @change="applyFilters">
+        <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
+      </el-select>
+
+      <el-input-number
+        v-model="query.minPrice"
+        class="filter-number"
+        :min="0"
+        :controls="false"
+        placeholder="Min price"
+        @change="applyFilters"
+      />
+
+      <el-input-number
+        v-model="query.maxPrice"
+        class="filter-number"
+        :min="0"
+        :controls="false"
+        placeholder="Max price"
+        @change="applyFilters"
+      />
+
+      <el-input-number
+        v-model="query.minArea"
+        class="filter-number"
+        :min="0"
+        :controls="false"
+        placeholder="Min area"
+        @change="applyFilters"
+      />
+
+      <el-input-number
+        v-model="query.maxArea"
+        class="filter-number"
+        :min="0"
+        :controls="false"
+        placeholder="Max area"
+        @change="applyFilters"
+      />
+
+      <el-select v-model="query.sortBy" placeholder="Sort by" @change="applyFilters">
+        <el-option v-for="item in sortOptions" :key="item.value" :label="item.label" :value="item.value" />
+      </el-select>
+
+      <el-select v-model="query.sortDirection" placeholder="Direction" @change="applyFilters">
+        <el-option label="Desc" value="desc" />
+        <el-option label="Asc" value="asc" />
+      </el-select>
+
+      <el-button @click="resetFilters">Reset filter</el-button>
+    </section>
+
+    <section class="property-table-card" v-loading="loading">
+      <div v-if="errorMessage" class="state-panel">
+        <h3>Không tải được danh sách</h3>
+        <p>{{ errorMessage }}</p>
+        <el-button class="primary-action" @click="loadProperties">Retry</el-button>
       </div>
 
-      <!-- Filters Row -->
-      <div class="controls-row">
-        <!-- Search -->
-        <div class="search-box">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input 
-            v-model="searchQuery" 
-            type="text" 
-            placeholder="Tìm theo tiêu đề, địa chỉ..." 
+      <template v-else>
+        <el-table v-if="properties.length" class="desktop-table" :data="properties" row-key="id">
+          <el-table-column label="Ảnh" width="92">
+            <template #default="{ row }">
+              <img class="property-thumb" :src="getThumbnail(row)" :alt="row.title" @error="handleImageError" />
+            </template>
+          </el-table-column>
+
+          <el-table-column label="Mã" min-width="110">
+            <template #default="{ row }">
+              <span class="mono table-code">{{ row.code || '-' }}</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="Tiêu đề" min-width="220">
+            <template #default="{ row }">
+              <button class="title-link" @click="router.push({ name: 'property-detail', params: { id: row.id } })">
+                {{ row.title }}
+              </button>
+              <span class="table-address">{{ row.address || '-' }}</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="Loại/Danh mục" min-width="170">
+            <template #default="{ row }">{{ getCategoryText(row) }}</template>
+          </el-table-column>
+
+          <el-table-column label="Giá" min-width="140">
+            <template #default="{ row }">
+              <strong class="numeric">{{ formatCurrency(row.price) }}</strong>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="Diện tích" width="110">
+            <template #default="{ row }">
+              <span class="numeric">{{ formatNumber(Number(row.area ?? row.acreage ?? 0)) }} m2</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="Khu vực" min-width="190">
+            <template #default="{ row }">{{ getLocationText(row) }}</template>
+          </el-table-column>
+
+          <el-table-column label="Trạng thái" width="120">
+            <template #default="{ row }">
+              <span class="status-badge" :class="getStatusClass(row.status)">
+                {{ getStatusLabel(row.status) }}
+              </span>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="Ngày tạo" width="116">
+            <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
+          </el-table-column>
+
+          <el-table-column label="Actions" width="126" align="right">
+            <template #default="{ row }">
+              <div class="table-actions">
+                <el-button circle :icon="ViewIcon" title="View detail" @click="router.push({ name: 'property-detail', params: { id: row.id } })" />
+                <el-button
+                  v-if="canMutate"
+                  circle
+                  :icon="Edit"
+                  title="Edit"
+                  @click="router.push({ name: 'property-edit', params: { id: row.id } })"
+                />
+                <el-button v-if="canMutate" circle :icon="Delete" title="Delete" @click="deleteProperty(row)" />
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div v-if="properties.length" class="mobile-list">
+          <article v-for="property in properties" :key="property.id" class="property-mobile-card">
+            <img :src="getThumbnail(property)" :alt="property.title" @error="handleImageError" />
+            <div class="property-mobile-card__body">
+              <div class="property-mobile-card__top">
+                <span class="mono">{{ property.code || '-' }}</span>
+                <span class="status-badge" :class="getStatusClass(property.status)">{{ getStatusLabel(property.status) }}</span>
+              </div>
+              <h3>{{ property.title }}</h3>
+              <p>{{ getLocationText(property) }}</p>
+              <div class="property-mobile-card__meta">
+                <strong>{{ formatCurrency(property.price) }}</strong>
+                <span>{{ formatNumber(Number(property.area ?? property.acreage ?? 0)) }} m2</span>
+              </div>
+              <div class="property-mobile-card__actions">
+                <el-button size="small" @click="router.push({ name: 'property-detail', params: { id: property.id } })">
+                  View
+                </el-button>
+                <el-button
+                  v-if="canMutate"
+                  size="small"
+                  @click="router.push({ name: 'property-edit', params: { id: property.id } })"
+                >
+                  Edit
+                </el-button>
+                <el-button v-if="canMutate" size="small" @click="deleteProperty(property)">Delete</el-button>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <el-empty v-if="!properties.length" description="Chưa có bất động sản phù hợp với bộ lọc.">
+          <el-button v-if="canMutate" class="primary-action" @click="router.push({ name: 'property-create' })">
+            Add Property
+          </el-button>
+        </el-empty>
+
+        <div v-if="properties.length" class="pagination-row">
+          <el-pagination
+            background
+            layout="total, sizes, prev, pager, next"
+            :current-page="query.page"
+            :page-size="query.pageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            :total="total"
+            @current-change="handlePageChange"
+            @size-change="handlePageSizeChange"
           />
         </div>
-
-        <!-- Filters group -->
-        <div class="filters-group">
-          <!-- Source -->
-          <div class="select-wrapper">
-            <select v-model="selectedSource">
-              <option value="all">Tất cả nguồn</option>
-              <option value="internal">Tin nội bộ</option>
-              <option value="batdongsan.com.vn">Batdongsan.com</option>
-              <option value="chotot.com">Chợ Tốt BĐS</option>
-            </select>
-          </div>
-
-          <!-- Status -->
-          <div class="select-wrapper">
-            <select v-model="selectedStatus">
-              <option value="all">Tất cả trạng thái</option>
-              <option v-for="status in PROPERTY_STATUSES" :key="status" :value="status">
-                {{ status === 'draft' ? 'Nháp' : status === 'verified' ? 'Đã duyệt' : status === 'published' ? 'Đã đăng' : 'Hết hạn' }}
-              </option>
-            </select>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Product Grid -->
-    <div class="properties-grid">
-      <div 
-        v-for="prop in filteredProperties" 
-        :key="prop.id"
-        class="grid-item"
-      >
-        <PropertyCard 
-          :property="prop"
-          @click="openDetail"
-          @edit="openEditModal"
-          @delete="deletePropertyItem"
-        />
-      </div>
-      
-      <div v-if="filteredProperties.length === 0" class="empty-state-card glass-card">
-        Không tìm thấy sản phẩm bất động sản nào phù hợp với điều kiện tìm kiếm.
-      </div>
-    </div>
-
-    <!-- 1. DETAIL PROPERTY INSIGHT DRAWER (Sliding panel) -->
-    <div v-if="activeDetailProperty" class="drawer-overlay" @click.self="closeDetail">
-      <div class="drawer-content glass-card">
-        <div class="drawer-header">
-          <h3>Chi tiết & AI Định giá</h3>
-          <button class="close-btn" @click="closeDetail">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-
-        <div class="drawer-body">
-          <div class="drawer-media">
-            <img :src="activeDetailProperty.imageUrl" :alt="activeDetailProperty.title" />
-            <span class="source-tag-overlay">{{ activeDetailProperty.source }}</span>
-          </div>
-
-          <div class="detail-info-block">
-            <h4 class="detail-title">{{ activeDetailProperty.title }}</h4>
-            <p class="detail-address">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
-              </svg>
-              {{ activeDetailProperty.address }}
-            </p>
-            
-            <div class="detail-specs">
-              <span class="spec-badge">📐 Diện tích: {{ activeDetailProperty.acreage }} m²</span>
-              <span class="spec-badge">🛏️ Số phòng ngủ: {{ activeDetailProperty.bedrooms }} PN</span>
-            </div>
-          </div>
-
-          <!-- AI Valuation Model Widget -->
-          <div class="ai-valuation-section glass-card">
-            <div class="ai-val-header">
-              <span class="sparkle-icon">✨</span>
-              <span>AI Valuation Engine</span>
-            </div>
-            
-            <div class="val-grid">
-              <div class="val-col">
-                <span class="lbl">Giá chào bán</span>
-                <strong class="val numeric">{{ formatCurrency(activeDetailProperty.price) }}</strong>
-              </div>
-              <div class="val-col border-left">
-                <span class="lbl">AI Định giá thị trường</span>
-                <strong class="val numeric text-ai">{{ formatCurrency(aiValuation) }}</strong>
-              </div>
-            </div>
-
-            <div class="val-analysis-bar" :class="{ 'overpriced': activeDetailProperty.price > aiValuation }">
-              <span>Độ chênh lệch giá chào so với AI: <strong>{{ priceDiffPercent }}</strong></span>
-              <span class="status-lbl">
-                {{ activeDetailProperty.price > aiValuation ? 'Giá cao hơn thị trường' : 'Giá hấp dẫn / Đáng mua' }}
-              </span>
-            </div>
-          </div>
-
-          <!-- Position Insights -->
-          <div class="location-insights-section">
-            <h5 class="section-title">Đánh giá tiềm năng vị trí</h5>
-            <ul class="insights-list">
-              <li>Mật độ tìm kiếm bất động sản tương tự trong khu vực {{ activeDetailProperty.area }} tăng **18.4%** tuần qua.</li>
-              <li>Liền kề hạ tầng quy hoạch trọng điểm, thanh khoản cao.</li>
-              <li>Độ chính xác dữ liệu thu thập tin đăng: **94%**.</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2. ADD/EDIT PROPERTY FORM MODAL -->
-    <div v-if="showFormModal" class="modal-overlay" @click.self="showFormModal = false">
-      <div class="modal-content glass-card">
-        <h3>{{ formTitle }}</h3>
-        
-        <form class="prop-form" @submit.prevent="saveProperty">
-          <div class="form-group">
-            <label>Tiêu đề tin đăng</label>
-            <input v-model="formProp.title" type="text" placeholder="Căn hộ 2PN Vinhomes view sông Sài Gòn..." required />
-          </div>
-
-          <div class="form-group">
-            <label>Địa chỉ bất động sản</label>
-            <input v-model="formProp.address" type="text" placeholder="Landmark 81, Vinhomes Central Park, Bình Thạnh" required />
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Khu vực (Quận/Huyện)</label>
-              <select v-model="formProp.area">
-                <option value="TP. Thủ Đức">TP. Thủ Đức</option>
-                <option value="Quận 7">Quận 7</option>
-                <option value="Bình Thạnh">Bình Thạnh</option>
-                <option value="Bình Chánh">Bình Chánh</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Nguồn tin</label>
-              <select v-model="formProp.source">
-                <option value="internal">Tin nội bộ (Internal)</option>
-                <option value="batdongsan.com.vn">Batdongsan.com.vn</option>
-                <option value="chotot.com">Chợ Tốt BĐS</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Giá trị BĐS (VND)</label>
-              <input v-model.number="formProp.price" type="number" placeholder="4500000000" required />
-            </div>
-            <div class="form-group">
-              <label>Diện tích (m²)</label>
-              <input v-model.number="formProp.acreage" type="number" placeholder="75" required />
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Số phòng ngủ</label>
-              <input v-model.number="formProp.bedrooms" type="number" placeholder="2" />
-            </div>
-            <div class="form-group">
-              <label>Trạng thái duyệt</label>
-              <select v-model="formProp.status">
-                <option value="draft">Nháp (Draft)</option>
-                <option value="verified">Đã duyệt (Verified)</option>
-                <option value="published">Đã đăng (Published)</option>
-                <option value="expired">Hết hạn (Expired)</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Hình ảnh sản phẩm</label>
-            
-            <!-- Hidden input for file selection -->
-            <input 
-              type="file" 
-              ref="fileInput" 
-              accept="image/*" 
-              class="hidden-input" 
-              @change="handleFileUpload" 
-            />
-
-            <!-- Preview Mode -->
-            <div v-if="formProp.imageUrl" class="image-preview-container">
-              <img :src="formProp.imageUrl" class="image-preview-thumbnail" />
-              <div class="preview-actions">
-                <button type="button" class="action-btn--change" @click="fileInput?.click()">Thay đổi</button>
-                <button type="button" class="action-btn--remove" @click="formProp.imageUrl = ''">Xóa ảnh</button>
-              </div>
-            </div>
-
-            <!-- Upload Area (when no image) -->
-            <div v-else class="upload-dropzone" @click="fileInput?.click()">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-              </svg>
-              <span class="upload-title">Tải ảnh lên từ thiết bị</span>
-              <span class="upload-subtitle">Hỗ trợ PNG, JPG, JPEG từ máy tính/điện thoại</span>
-            </div>
-
-            <!-- Paste URL fallback -->
-            <div class="url-input-fallback">
-              <span class="or-divider">Hoặc nhập URL ảnh trực tiếp:</span>
-              <input v-model="formProp.imageUrl" type="text" placeholder="https://images.unsplash.com/..." />
-            </div>
-          </div>
-
-          <div class="modal-actions">
-            <button type="button" class="btn-cancel" @click="showFormModal = false">Hủy bỏ</button>
-            <button type="submit" class="btn-submit glow-yellow">Xác nhận</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
+      </template>
+    </section>
+  </section>
 </template>
 
 <style scoped>
-.properties-header {
-  padding: 20px 24px;
+.property-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
-.header-main {
+.property-header,
+.filter-card,
+.property-table-card {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: var(--elevation-surface);
+}
+
+.property-header {
+  align-items: center;
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
+  padding: 20px 22px;
 }
 
-.header-main h2 {
-  font-size: 18px;
-  font-weight: 700;
-  margin: 0 0 4px 0;
+.property-header h1 {
   color: var(--color-text-primary);
+  font-size: 22px;
+  line-height: 1.2;
+  margin: 0 0 6px;
 }
 
-.subtitle-text {
-  font-size: 12.5px;
+.property-header p {
   color: var(--color-text-secondary);
   margin: 0;
 }
 
-.add-prop-btn {
-  background-color: var(--color-yellow);
+.property-header__actions,
+.table-actions,
+.property-mobile-card__actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.primary-action {
+  background: var(--color-yellow);
+  border-color: var(--color-yellow);
   color: var(--color-yellow-text);
-  border: none;
-  font-size: 12.5px;
-  font-weight: 600;
-  padding: 10px 18px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all var(--duration-fast);
+  font-weight: 700;
 }
 
-.add-prop-btn:hover {
-  background-color: var(--color-yellow-hover);
-  transform: translateY(-1px);
+.primary-action:hover {
+  background: var(--color-yellow-hover);
+  border-color: var(--color-yellow-hover);
+  color: var(--color-yellow-text);
 }
 
-/* Controls */
-.controls-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background-color: var(--color-surface-glass);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 0 12px;
-  height: 38px;
-  flex: 1;
-  max-width: 300px;
-  min-width: 200px;
-}
-
-.search-box input {
-  background: transparent;
-  border: none;
-  font-size: 12.5px;
-  width: 100%;
-  color: var(--color-text-primary);
-}
-
-.search-box input:focus {
-  outline: none;
-}
-
-.search-box svg {
-  color: var(--color-text-muted);
-}
-
-.filters-group {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.select-wrapper select {
-  height: 38px;
-  background-color: var(--color-surface-glass);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 0 12px 0 8px;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: all var(--duration-fast);
-}
-
-.select-wrapper select:focus {
-  outline: none;
-  border-color: var(--color-border-strong);
-}
-
-/* Properties Grid */
-.properties-grid {
+.filter-card {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
-}
-
-.grid-item {
-  animation: fadein var(--duration-base) var(--ease-spring);
-}
-
-.empty-state-card {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 48px;
-  color: var(--color-text-muted);
-  font-size: 13px;
-}
-
-/* --- Detail Drawer --- */
-.drawer-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(3, 7, 18, 0.4);
-  z-index: var(--z-modal);
-  display: flex;
-  justify-content: flex-end;
-}
-
-.drawer-content {
-  width: 440px;
-  height: 100vh;
-  border-radius: 0;
-  border-left: 1px solid var(--color-border);
-  border-right: none;
-  border-top: none;
-  border-bottom: none;
-  display: flex;
-  flex-direction: column;
-  box-shadow: var(--elevation-floating);
-  animation: slide-in var(--duration-base) var(--ease-spring);
-}
-
-@keyframes slide-in {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
-}
-
-.drawer-header {
-  padding: 20px;
-  border-bottom: 1px solid var(--color-border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.drawer-header h3 {
-  margin: 0;
-  font-size: 15px;
-}
-
-.close-btn {
-  background: transparent;
-  border: none;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
-  display: flex;
-}
-
-.close-btn:hover {
-  background: var(--color-surface-hover);
-  color: var(--color-text-primary);
-}
-
-.drawer-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.drawer-media {
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  border-radius: 12px;
-  overflow: hidden;
-  position: relative;
-  background-color: var(--color-divider);
-}
-
-.drawer-media img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.source-tag-overlay {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  background: rgba(15, 23, 42, 0.8);
-  color: #fff;
-  font-size: 9px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 6px;
-  text-transform: uppercase;
-}
-
-.detail-info-block {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.detail-title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--color-text-primary);
-  line-height: 1.4;
-}
-
-.detail-address {
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--color-text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.detail-address svg {
-  color: var(--color-text-muted);
-}
-
-.detail-specs {
-  display: flex;
   gap: 12px;
+  grid-template-columns: minmax(240px, 1.8fr) repeat(5, minmax(140px, 1fr));
+  padding: 16px;
+}
+
+.filter-number {
+  width: 100%;
+}
+
+.property-table-card {
+  min-height: 320px;
+  overflow: hidden;
+  padding: 8px;
+}
+
+.property-thumb {
+  background: #f8fafc;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  height: 58px;
+  object-fit: cover;
+  width: 74px;
+}
+
+.table-code {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.title-link {
+  background: transparent;
+  border: 0;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  display: block;
+  font-weight: 700;
+  line-height: 1.35;
+  padding: 0;
+  text-align: left;
+}
+
+.title-link:hover {
+  color: #8a7a00;
+}
+
+.table-address {
+  color: var(--color-text-muted);
+  display: block;
+  font-size: 12px;
   margin-top: 4px;
-}
-
-.spec-badge {
-  background-color: var(--color-surface-hover);
-  border: 1px solid var(--color-border);
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 11.5px;
-  color: var(--color-text-secondary);
-  font-weight: 600;
-}
-
-/* AI Valuation Panel */
-.ai-valuation-section {
-  display: flex;
-  flex-direction: column;
+  max-width: 270px;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.ai-val-header {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--color-divider);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 700;
-  font-size: 12px;
-  color: var(--color-ai);
-}
-
-.val-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  padding: 16px 14px;
-}
-
-.val-col {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.val-col.border-left {
-  border-left: 1px solid var(--color-divider);
-  padding-left: 16px;
-}
-
-.val-col .lbl {
+.status-badge {
+  border-radius: 6px;
+  display: inline-flex;
   font-size: 10px;
-  color: var(--color-text-muted);
+  font-weight: 800;
+  line-height: 1;
+  padding: 5px 8px;
   text-transform: uppercase;
 }
 
-.val-col .val {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--color-text-primary);
-}
-
-.val-analysis-bar {
-  background-color: var(--color-success-bg);
-  border-top: 1px solid var(--color-success-border);
+.status-available,
+.status-active,
+.status-published,
+.status-verified {
+  background: var(--color-success-bg);
+  border: 1px solid var(--color-success-border);
   color: var(--color-success);
-  padding: 8px 14px;
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  font-weight: 600;
 }
 
-.val-analysis-bar.overpriced {
-  background-color: var(--color-danger-bg);
-  border-top-color: var(--color-danger-border);
-  color: var(--color-danger);
-}
-
-.val-analysis-bar .status-lbl {
-  text-transform: uppercase;
-  font-size: 9px;
-  font-weight: 700;
-}
-
-.location-insights-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.section-title {
-  margin: 0;
-  font-size: 12.5px;
-  font-weight: 600;
-}
-
-.insights-list {
-  margin: 0;
-  padding-left: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 12px;
+.status-draft,
+.status-hidden {
+  background: #f1f5f9;
+  border: 1px solid var(--color-border);
   color: var(--color-text-secondary);
 }
 
-/* --- Form Modals --- */
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(3, 7, 18, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--z-modal);
+.status-sold,
+.status-rented {
+  background: var(--color-info-bg);
+  border: 1px solid var(--color-info-border);
+  color: var(--color-info);
 }
 
-.modal-content {
-  width: 460px;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  box-shadow: var(--elevation-floating);
-  animation: fadein var(--duration-base) var(--ease-spring);
-}
-
-.modal-content h3 {
-  margin: 0;
-  font-size: 15px;
-}
-
-.prop-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.form-group label {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
-.form-group input,
-.form-group select {
-  border: 1px solid var(--color-border);
-  background-color: var(--color-canvas);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 12.5px;
-  color: var(--color-text-primary);
-}
-
-.form-group input:focus,
-.form-group select:focus {
-  outline: none;
-  border-color: var(--color-border-strong);
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.btn-cancel {
-  height: 36px;
-  padding: 0 16px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: transparent;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.btn-submit {
-  height: 36px;
-  padding: 0 16px;
-  border-radius: 8px;
-  border: none;
-  background-color: var(--color-yellow);
-  color: var(--color-yellow-text);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.hidden-input {
-  display: none;
-}
-
-.image-preview-container {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  background: var(--color-surface-glass);
-  border: 1px solid var(--color-border);
-  padding: 10px;
-  border-radius: 8px;
-}
-
-.image-preview-thumbnail {
-  width: 72px;
-  height: 48px;
-  object-fit: cover;
-  border-radius: 6px;
-  border: 1px solid var(--color-border);
-}
-
-.preview-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.action-btn--change,
-.action-btn--remove {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--duration-fast);
-}
-
-.action-btn--change {
-  background: var(--color-surface-hover);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-primary);
-}
-
-.action-btn--change:hover {
-  background: var(--color-divider);
-}
-
-.action-btn--remove {
+.status-expired {
   background: var(--color-danger-bg);
   border: 1px solid var(--color-danger-border);
   color: var(--color-danger);
 }
 
-.action-btn--remove:hover {
-  background: var(--color-danger);
-  color: #ffffff;
-}
-
-.upload-dropzone {
-  border: 1px dashed var(--color-border);
-  background-color: var(--color-surface-glass);
-  border-radius: 8px;
-  padding: 16px;
+.state-panel {
+  align-items: center;
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
-  gap: 6px;
-  cursor: pointer;
-  transition: all var(--duration-fast);
-}
-
-.upload-dropzone:hover {
-  border-color: var(--color-border-strong);
-  background-color: var(--color-surface-hover);
-}
-
-.upload-dropzone svg {
-  color: var(--color-text-muted);
-}
-
-.upload-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.upload-subtitle {
-  font-size: 10px;
-  color: var(--color-text-muted);
+  min-height: 300px;
+  padding: 32px;
   text-align: center;
 }
 
-.url-input-fallback {
-  margin-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.state-panel h3 {
+  font-size: 16px;
+  margin: 0 0 8px;
 }
 
-.or-divider {
-  font-size: 10px;
-  color: var(--color-text-muted);
+.state-panel p {
+  color: var(--color-text-secondary);
+  margin: 0 0 16px;
+}
+
+.pagination-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 8px 6px;
+}
+
+.mobile-list {
+  display: none;
+}
+
+.property-mobile-card {
+  border-bottom: 1px solid var(--color-divider);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 110px minmax(0, 1fr);
+  padding: 12px 4px;
+}
+
+.property-mobile-card img {
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  height: auto;
+  object-fit: cover;
+  width: 100%;
+}
+
+.property-mobile-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.property-mobile-card__top,
+.property-mobile-card__meta {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.property-mobile-card h3 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.property-mobile-card p {
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+@media (max-width: 1280px) {
+  .filter-card {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  .property-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .filter-card {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .filter-card {
+    grid-template-columns: 1fr;
+  }
+
+  .desktop-table {
+    display: none;
+  }
+
+  .mobile-list {
+    display: block;
+  }
+
+  .pagination-row {
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 520px) {
+  .property-mobile-card {
+    grid-template-columns: 1fr;
+  }
+
+  .property-header__actions {
+    width: 100%;
+  }
+
+  .property-header__actions .el-button {
+    flex: 1;
+  }
 }
 </style>

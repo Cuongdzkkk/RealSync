@@ -43,7 +43,14 @@ const navItems: NavItem[] = [
     to: '/admin/properties',
     icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3',
     group: 'properties',
-    roles: ['Admin', 'Sales', 'Marketing']
+    roles: ['Admin', 'Manager', 'Sales', 'Marketing', 'Data Analyst']
+  },
+  {
+    label: 'Danh mục BĐS',
+    to: '/admin/property-categories',
+    icon: 'M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z',
+    group: 'properties',
+    roles: ['Admin', 'Manager', 'Marketing']
   },
   {
     label: 'Dự án',

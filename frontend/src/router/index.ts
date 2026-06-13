@@ -35,6 +35,24 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Sản phẩm' }
       },
       {
+        path: 'properties/create',
+        name: 'property-create',
+        component: () => import('@/views/properties/PropertyFormView.vue'),
+        meta: { title: 'Tạo bất động sản' }
+      },
+      {
+        path: 'properties/:id/edit',
+        name: 'property-edit',
+        component: () => import('@/views/properties/PropertyFormView.vue'),
+        meta: { title: 'Chỉnh sửa bất động sản' }
+      },
+      {
+        path: 'property-categories',
+        name: 'property-categories',
+        component: () => import('@/views/properties/PropertyCategoryView.vue'),
+        meta: { title: 'Danh mục bất động sản' }
+      },
+      {
         path: 'projects',
         name: 'projects',
         component: () => import('@/views/projects/ProjectListView.vue'),

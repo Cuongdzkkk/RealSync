@@ -8,15 +8,17 @@ const storageKey = 'realsync.accessToken';
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref(localStorage.getItem(storageKey));
-  const user = ref<UserProfile | null>({
-    id: 'local-admin',
-    fullName: 'RealSync Admin',
-    email: 'admin@realsync.vn',
-    role: 'Admin'
-  });
+  const user = ref<UserProfile | null>(accessToken.value
+    ? {
+        id: 'local-admin',
+        fullName: 'RealSync Admin',
+        email: 'admin@realsync.vn',
+        role: 'Admin'
+      }
+    : null);
   const loading = ref(false);
 
-  const isAuthenticated = computed(() => Boolean(accessToken.value) || import.meta.env.DEV);
+  const isAuthenticated = computed(() => Boolean(accessToken.value));
 
   const login = async (payload: LoginRequest) => {
     loading.value = true;

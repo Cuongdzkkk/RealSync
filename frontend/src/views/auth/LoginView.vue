@@ -9,17 +9,12 @@ const router = useRouter();
 const authStore = useAuthStore();
 const form = reactive({
   email: 'admin@realsync.vn',
-  password: ''
+  password: 'Admin@123'
 });
 
 const submit = async () => {
-  if (import.meta.env.DEV) {
-    ElMessage.success('Đăng nhập chế độ local');
-    await router.push('/admin/dashboard');
-    return;
-  }
-
   await authStore.login(form);
+  ElMessage.success('Đăng nhập thành công');
   await router.push('/admin/dashboard');
 };
 </script>
