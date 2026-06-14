@@ -231,6 +231,27 @@ public class PaginationMeta
 | `GET` | `/users` | Danh sách users | ✅ Admin |
 | `POST` | `/users` | Tạo user | ✅ Admin |
 
+### 5.6 Posting
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `GET` | `/posts` | Danh sách bài đăng (paginated) | ✅ |
+| `GET` | `/posts/{id}` | Chi tiết bài đăng | ✅ |
+| `POST` | `/posts` | Tạo bài đăng | ✅ Manager+ |
+| `PUT` | `/posts/{id}` | Cập nhật bài đăng | ✅ Manager+ |
+| `PATCH` | `/posts/{id}/status` | Đổi trạng thái | ✅ Manager+ |
+| `DELETE` | `/posts/{id}` | Xóa mềm | ✅ Admin |
+| `GET` | `/posts/{id}/channels` | Channels của post | ✅ |
+| `POST` | `/posts/{id}/channels` | Thêm channel | ✅ Manager+ |
+| `POST` | `/posts/{id}/channels/{channelId}/publish` | Publish lên kênh | ✅ Manager+ |
+| `GET` | `/posts/{id}/schedules` | Lịch của post | ✅ |
+| `POST` | `/posts/{id}/schedules` | Lên lịch đăng | ✅ Manager+ |
+| `DELETE` | `/posts/{id}/schedules/{scheduleId}` | Hủy lịch | ✅ Manager+ |
+| `GET` | `/posts/{id}/analytics` | Analytics của post | ✅ |
+| `GET` | `/post-analytics/summary` | Tổng hợp analytics | ✅ Manager+ |
+| `POST` | `/posts/{id}/ai-content/generate` | Generate AI content | ✅ Manager+ |
+| `GET` | `/posts/{id}/ai-content` | Lịch sử AI generation | ✅ |
+
 ---
 
 ## 6. HTTP Status Codes

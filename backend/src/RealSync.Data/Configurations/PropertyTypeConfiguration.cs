@@ -15,6 +15,9 @@ public class PropertyTypeConfiguration : IEntityTypeConfiguration<PropertyType>
             .IsRequired()
             .HasMaxLength(100);
 
+        builder.Property(e => e.Slug)
+            .HasMaxLength(150);
+
         builder.Property(e => e.Description)
             .HasMaxLength(500);
 
@@ -22,6 +25,8 @@ public class PropertyTypeConfiguration : IEntityTypeConfiguration<PropertyType>
             .HasMaxLength(100);
 
         builder.HasIndex(e => e.Name).IsUnique();
+        builder.HasIndex(e => e.Slug).IsUnique()
+            .HasFilter("[Slug] IS NOT NULL");
         builder.HasQueryFilter(e => !e.IsDeleted);
     }
 }

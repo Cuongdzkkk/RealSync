@@ -20,6 +20,26 @@
       "key": "refreshToken",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "currentPostId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "currentChannelId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "currentScheduleId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "currentAiContentId",
+      "value": "",
+      "type": "string"
     }
   ],
   "auth": {
@@ -219,6 +239,397 @@
         }
       ],
       "description": "Authentication endpoints. Chạy Login trước, token tự lưu, các request khác tự gắn token."
+    },
+    {
+      "name": "📢 Posting Management",
+      "item": [
+        {
+          "name": "📝 Posts",
+          "item": [
+            {
+              "name": "Create Post",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var json = pm.response.json();",
+                      "    pm.collectionVariables.set('currentPostId', json.data.id);",
+                      "    console.log('✅ currentPostId saved: ' + json.data.id);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Căn hộ cao cấp Vinhomes Grand Park 2PN2WC giá cực tốt\",\n  \"content\": \"Bán căn hộ Vinhomes Grand Park, Quận 9 cũ. Diện tích 69m2, thiết kế 2 phòng ngủ, 2 nhà vệ sinh. Full nội thất cao cấp chỉ xách vali vào ở. View trực diện công viên 36ha cực đẹp. Sổ hồng riêng sẵn sàng giao dịch ngay.\",\n  \"summary\": \"Căn hộ Vinhomes Grand Park 2PN 69m2 full nội thất view công viên 36ha giá tốt.\",\n  \"thumbnailUrl\": \"https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800\",\n  \"propertyId\": null\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/posts",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts"]
+                },
+                "description": "Tạo bài đăng BĐS mới. Tự động lưu currentPostId vào biến môi trường."
+              }
+            },
+            {
+              "name": "Get List Posts",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/posts?page=1&pageSize=10&status=Draft",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts"],
+                  "query": [
+                    { "key": "page", "value": "1" },
+                    { "key": "pageSize", "value": "10" },
+                    { "key": "status", "value": "Draft", "description": "Lọc theo trạng thái: Draft, Scheduled, Published, Failed, Archived (Không bắt buộc)" },
+                    { "key": "search", "value": "Vinhomes", "disabled": true, "description": "Tìm kiếm theo tiêu đề/nội dung (Không bắt buộc)" }
+                  ]
+                },
+                "description": "Lấy danh sách bài đăng có phân trang và filter."
+              }
+            },
+            {
+              "name": "Get Post By ID",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/posts/{{currentPostId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts", "{{currentPostId}}"]
+                },
+                "description": "Lấy thông tin chi tiết một bài đăng."
+              }
+            },
+            {
+              "name": "Update Post",
+              "request": {
+                "method": "PUT",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"[Cập nhật] Căn hộ Vinhomes Grand Park 2PN full nội thất view 36ha\",\n  \"content\": \"Cập nhật: Bán căn hộ Vinhomes Grand Park, Quận 9. Diện tích 69m2, 2PN, 2WC. Hỗ trợ vay ngân hàng 70%, ân hạn gốc lãi. View nội khu và hồ bơi thoáng mát. Liên hệ xem nhà 24/7.\",\n  \"summary\": \"Căn hộ Vinhomes Grand Park 2PN full nội thất view đẹp hỗ trợ vay.\",\n  \"thumbnailUrl\": \"https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800\",\n  \"propertyId\": null\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/posts/{{currentPostId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts", "{{currentPostId}}"]
+                },
+                "description": "Cập nhật tiêu đề, nội dung, ảnh đại diện của bài đăng."
+              }
+            },
+            {
+              "name": "Update Post Status",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"Published\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/posts/{{currentPostId}}/status",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts", "{{currentPostId}}", "status"]
+                },
+                "description": "Cập nhật nhanh trạng thái bài đăng. Giá trị hợp lệ: Draft, Scheduled, Published, Failed, Archived."
+              }
+            },
+            {
+              "name": "Delete Post",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{baseUrl}}/posts/{{currentPostId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts", "{{currentPostId}}"]
+                },
+                "description": "Xóa mềm bài đăng (IsDeleted = true)."
+              }
+            }
+          ]
+        },
+        {
+          "name": "🌐 Channels",
+          "item": [
+            {
+              "name": "Add Channel To Post",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var json = pm.response.json();",
+                      "    pm.collectionVariables.set('currentChannelId', json.data.id);",
+                      "    console.log('✅ currentChannelId saved: ' + json.data.id);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"channel\": \"Facebook\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/posts/{{currentPostId}}/channels",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts", "{{currentPostId}}", "channels"]
+                },
+                "description": "Thêm kênh đăng bài cho Post. Giá trị kênh phổ biến: Website, Facebook, Batdongsan, Chotot, Zalo. Tự động lưu currentChannelId."
+              }
+            },
+            {
+              "name": "Get Channels By Post ID",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/posts/{{currentPostId}}/channels",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts", "{{currentPostId}}", "channels"]
+                },
+                "description": "Xem danh sách các kênh đăng bài đã cấu hình cho bài viết."
+              }
+            },
+            {
+              "name": "Update Channel",
+              "request": {
+                "method": "PUT",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"channel\": \"Batdongsan\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/posts/{{currentPostId}}/channels/{{currentChannelId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts", "{{currentPostId}}", "channels", "{{currentChannelId}}"]
+                },
+                "description": "Cập nhật kênh đăng bài."
+              }
+            },
+            {
+              "name": "Publish Post to Channel",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/posts/{{currentPostId}}/channels/{{currentChannelId}}/publish",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts", "{{currentPostId}}", "channels", "{{currentChannelId}}", "publish"]
+                },
+                "description": "Mô phỏng publish bài đăng lên kênh mạng xã hội hoặc trang tin BĐS."
+              }
+            },
+            {
+              "name": "Delete Channel",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{baseUrl}}/posts/{{currentPostId}}/channels/{{currentChannelId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts", "{{currentPostId}}", "channels", "{{currentChannelId}}"]
+                },
+                "description": "Hủy liên kết kênh đăng bài khỏi bài viết."
+              }
+            }
+          ]
+        },
+        {
+          "name": "📅 Schedules",
+          "item": [
+            {
+              "name": "Create Schedule",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var json = pm.response.json();",
+                      "    pm.collectionVariables.set('currentScheduleId', json.data.id);",
+                      "    console.log('✅ currentScheduleId saved: ' + json.data.id);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"scheduledAt\": \"2026-06-03T10:00:00Z\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/posts/{{currentPostId}}/schedules",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts", "{{currentPostId}}", "schedules"]
+                },
+                "description": "Lên lịch đăng bài viết vào một thời điểm trong tương lai. Ở Postman có thể truyền thời gian dạng ISO. Tự động lưu currentScheduleId."
+              }
+            },
+            {
+              "name": "Get Schedules By Post ID",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/posts/{{currentPostId}}/schedules",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts", "{{currentPostId}}", "schedules"]
+                },
+                "description": "Xem danh sách lịch đã đăng ký cho bài viết."
+              }
+            },
+            {
+              "name": "Get Upcoming Schedules",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/postschedules/upcoming?count=10",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["postschedules", "upcoming"],
+                  "query": [
+                    { "key": "count", "value": "10" }
+                  ]
+                },
+                "description": "Lấy danh sách các lịch đăng bài sắp tới trên toàn hệ thống."
+              }
+            },
+            {
+              "name": "Delete Schedule",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{baseUrl}}/posts/{{currentPostId}}/schedules/{{currentScheduleId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts", "{{currentPostId}}", "schedules", "{{currentScheduleId}}"]
+                },
+                "description": "Hủy lịch đăng bài viết (Chỉ hủy được khi trạng thái lịch là Pending)."
+              }
+            }
+          ]
+        },
+        {
+          "name": "📊 Analytics",
+          "item": [
+            {
+              "name": "Get Analytics By Post ID",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/posts/{{currentPostId}}/analytics",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts", "{{currentPostId}}", "analytics"]
+                },
+                "description": "Lấy chi tiết thống kê lượt xem, click, và Lead thu được từ bài viết. Tự động tạo bản ghi trống nếu chưa tồn tại."
+              }
+            },
+            {
+              "name": "Update Analytics",
+              "request": {
+                "method": "PUT",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"views\": 1500,\n  \"clicks\": 320,\n  \"leadsGenerated\": 25\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/posts/{{currentPostId}}/analytics",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts", "{{currentPostId}}", "analytics"]
+                },
+                "description": "Cập nhật số lượt xem, click và số lead mang về từ bài viết. Tự động tính toán ConversionRate."
+              }
+            },
+            {
+              "name": "Get Analytics Summary",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/postanalytics/summary",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["postanalytics", "summary"]
+                },
+                "description": "Xem báo cáo tổng hợp hiệu suất đăng bài của toàn hệ thống (Tổng bài, lượt xem, click, lead, tỷ lệ chuyển đổi trung bình)."
+              }
+            }
+          ]
+        },
+        {
+          "name": "🤖 AI Content",
+          "item": [
+            {
+              "name": "Generate AI Content",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var json = pm.response.json();",
+                      "    pm.collectionVariables.set('currentAiContentId', json.data.id);",
+                      "    console.log('✅ currentAiContentId saved: ' + json.data.id);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"prompt\": \"Hãy viết một bài đăng Facebook thu hút khách hàng có tiền cho căn hộ Vinhomes Grand Park này, nhấn mạnh view đẹp công viên 36ha và sẵn sổ hồng.\",\n  \"propertyId\": null\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/posts/{{currentPostId}}/ai-content/generate",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts", "{{currentPostId}}", "ai-content", "generate"]
+                },
+                "description": "Yêu cầu AI viết bài mô phỏng dựa trên prompt và BĐS. Tự động lưu currentAiContentId."
+              }
+            },
+            {
+              "name": "Get AI Content History",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/posts/{{currentPostId}}/ai-content",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts", "{{currentPostId}}", "ai-content"]
+                },
+                "description": "Lấy danh sách các lần tạo nội dung AI trước đó của bài viết."
+              }
+            },
+            {
+              "name": "Get AI Content By ID",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/posts/{{currentPostId}}/ai-content/{{currentAiContentId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["posts", "{{currentPostId}}", "ai-content", "{{currentAiContentId}}"]
+                },
+                "description": "Xem chi tiết một bản nháp nội dung AI cụ thể."
+              }
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "📊 Dashboard",

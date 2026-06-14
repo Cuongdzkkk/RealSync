@@ -28,6 +28,7 @@ public class RealSyncDbContext : DbContext
 
     // Core
     public DbSet<Property> Properties => Set<Property>();
+    public DbSet<PropertyCategory> PropertyCategories => Set<PropertyCategory>();
     public DbSet<PropertyType> PropertyTypes => Set<PropertyType>();
     public DbSet<PropertyImage> PropertyImages => Set<PropertyImage>();
     public DbSet<Project> Projects => Set<Project>();
@@ -56,6 +57,13 @@ public class RealSyncDbContext : DbContext
     // System
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
+
+    // Posting
+    public DbSet<Post> Posts => Set<Post>();
+    public DbSet<PostChannel> PostChannels => Set<PostChannel>();
+    public DbSet<PostAnalytics> PostAnalytics => Set<PostAnalytics>();
+    public DbSet<PostSchedule> PostSchedules => Set<PostSchedule>();
+    public DbSet<AIContentGeneration> AIContentGenerations => Set<AIContentGeneration>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

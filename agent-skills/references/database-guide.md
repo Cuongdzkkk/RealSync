@@ -186,6 +186,12 @@ Users          1 ──── N  Leads (AssignedTo)
 CrawlSources   1 ──── N  CrawlJobs
 CrawlJobs      1 ──── N  CrawlResults
 CrawlJobs      1 ──── N  Properties (SourceJobId)
+Users          1 ──── N  Posts (AuthorId)
+Properties     1 ──── N  Posts (PropertyId, nullable)
+Posts          1 ──── N  PostChannels
+Posts          1 ──── 1  PostAnalytics
+Posts          1 ──── N  PostSchedules
+Posts          1 ──── N  AIContentGenerations
 ```
 
 ---

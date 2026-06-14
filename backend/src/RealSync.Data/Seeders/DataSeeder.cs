@@ -13,9 +13,11 @@ public static class DataSeeder
     public static async Task SeedAsync(RealSyncDbContext context)
     {
         await SeedRolesAsync(context);
+        await SeedPropertyCategoriesAsync(context);
         await SeedPropertyTypesAsync(context);
         await SeedAreasAsync(context);
         await SeedPermissionsAsync(context);
+        await SeedPostingPermissionsAsync(context);
         await SeedAdminUserAsync(context);
 
         await context.SaveChangesAsync();
@@ -31,6 +33,7 @@ public static class DataSeeder
             new Role { Name = "Manager", Description = "Quản lý" },
             new Role { Name = "Agent", Description = "Nhân viên kinh doanh" },
             new Role { Name = "Viewer", Description = "Người xem" },
+            new Role { Name = "Marketing", Description = "Nhân viên marketing" },
         };
 
         context.Roles.AddRange(roles);
@@ -42,17 +45,31 @@ public static class DataSeeder
 
         var types = new[]
         {
-            new PropertyType { Name = "Đất nền", Description = "Đất nền dự án, đất thổ cư", SortOrder = 1 },
-            new PropertyType { Name = "Nhà phố", Description = "Nhà phố, nhà mặt tiền", SortOrder = 2 },
-            new PropertyType { Name = "Căn hộ", Description = "Căn hộ chung cư", SortOrder = 3 },
-            new PropertyType { Name = "Biệt thự", Description = "Biệt thự, villa", SortOrder = 4 },
-            new PropertyType { Name = "Nhà riêng", Description = "Nhà riêng, nhà trong hẻm", SortOrder = 5 },
-            new PropertyType { Name = "Shophouse", Description = "Nhà phố thương mại", SortOrder = 6 },
-            new PropertyType { Name = "Penthouse", Description = "Căn hộ penthouse", SortOrder = 7 },
-            new PropertyType { Name = "Đất nông nghiệp", Description = "Đất nông nghiệp, đất trồng cây", SortOrder = 8 },
+            new PropertyType { Name = "Đất nền", Slug = "dat-nen", Description = "Đất nền dự án, đất thổ cư", SortOrder = 1 },
+            new PropertyType { Name = "Nhà phố", Slug = "nha-pho", Description = "Nhà phố, nhà mặt tiền", SortOrder = 2 },
+            new PropertyType { Name = "Căn hộ", Slug = "can-ho", Description = "Căn hộ chung cư", SortOrder = 3 },
+            new PropertyType { Name = "Biệt thự", Slug = "biet-thu", Description = "Biệt thự, villa", SortOrder = 4 },
+            new PropertyType { Name = "Nhà riêng", Slug = "nha-rieng", Description = "Nhà riêng, nhà trong hẻm", SortOrder = 5 },
+            new PropertyType { Name = "Shophouse", Slug = "shophouse", Description = "Nhà phố thương mại", SortOrder = 6 },
+            new PropertyType { Name = "Penthouse", Slug = "penthouse", Description = "Căn hộ penthouse", SortOrder = 7 },
+            new PropertyType { Name = "Đất nông nghiệp", Slug = "dat-nong-nghiep", Description = "Đất nông nghiệp, đất trồng cây", SortOrder = 8 },
         };
 
         context.PropertyTypes.AddRange(types);
+    }
+
+    private static async Task SeedPropertyCategoriesAsync(RealSyncDbContext context)
+    {
+        if (await context.PropertyCategories.AnyAsync()) return;
+
+        var categories = new[]
+        {
+            new PropertyCategory { Name = "Nhà đất bán", Slug = "nha-dat-ban", Description = "Bất động sản đang chào bán" },
+            new PropertyCategory { Name = "Nhà đất cho thuê", Slug = "nha-dat-cho-thue", Description = "Bất động sản đang cho thuê" },
+            new PropertyCategory { Name = "Dự án", Slug = "du-an", Description = "Sản phẩm thuộc dự án bất động sản" },
+        };
+
+        context.PropertyCategories.AddRange(categories);
     }
 
     private static async Task SeedAreasAsync(RealSyncDbContext context)
@@ -174,8 +191,6 @@ public static class DataSeeder
 
     private static async Task SeedAdminUserAsync(RealSyncDbContext context)
     {
-        if (await context.Users.AnyAsync()) return;
-
         var adminRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Admin");
         var managerRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Manager");
         var agentRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Agent");
@@ -223,6 +238,67 @@ public static class DataSeeder
             },
         };
 
-        context.Users.AddRange(users);
+        var seedEmails = users.Select(seedUser => seedUser.Email).ToArray();
+        var existingEmails = await context.Users
+            .Where(u => seedEmails.Contains(u.Email))
+            .Select(u => u.Email)
+            .ToListAsync();
+
+        context.Users.AddRange(users.Where(u => !existingEmails.Contains(u.Email)));
+    }
+
+    private static async Task SeedPostingPermissionsAsync(RealSyncDbContext context)
+    {
+        // Chỉ seed nếu chưa có posting permissions
+        if (await context.Permissions.AnyAsync(p => p.Group == "posts")) return;
+
+        var postingPermissions = new List<Permission>
+        {
+            new() { Name = "posts.read", Group = "posts", Description = "Xem bài đăng" },
+            new() { Name = "posts.create", Group = "posts", Description = "Tạo bài đăng" },
+            new() { Name = "posts.update", Group = "posts", Description = "Cập nhật bài đăng" },
+            new() { Name = "posts.delete", Group = "posts", Description = "Xóa bài đăng" },
+            new() { Name = "posts.publish", Group = "posts", Description = "Đăng bài lên kênh" },
+        };
+
+        context.Permissions.AddRange(postingPermissions);
+        await context.SaveChangesAsync();
+
+        // Gán permissions cho roles
+        var admin = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Admin");
+        var manager = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Manager");
+        var agent = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Agent");
+        var marketing = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Marketing");
+
+        var allPostPerms = await context.Permissions.Where(p => p.Group == "posts").ToListAsync();
+
+        // Admin: tất cả quyền posting
+        if (admin != null)
+        {
+            foreach (var perm in allPostPerms)
+                context.RolePermissions.Add(new RolePermission { RoleId = admin.Id, PermissionId = perm.Id });
+        }
+
+        // Manager: tất cả quyền posting
+        if (manager != null)
+        {
+            foreach (var perm in allPostPerms)
+                context.RolePermissions.Add(new RolePermission { RoleId = manager.Id, PermissionId = perm.Id });
+        }
+
+        // Agent (Sales): read, create, update
+        if (agent != null)
+        {
+            var agentPostPerms = new[] { "posts.read", "posts.create", "posts.update" };
+            foreach (var perm in allPostPerms.Where(p => agentPostPerms.Contains(p.Name)))
+                context.RolePermissions.Add(new RolePermission { RoleId = agent.Id, PermissionId = perm.Id });
+        }
+
+        // Marketing: tất cả quyền posting
+        if (marketing != null)
+        {
+            foreach (var perm in allPostPerms)
+                context.RolePermissions.Add(new RolePermission { RoleId = marketing.Id, PermissionId = perm.Id });
+        }
     }
 }

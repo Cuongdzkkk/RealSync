@@ -28,12 +28,22 @@ public static class ServiceCollectionExtensions
 
         // Repositories
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+        services.AddScoped<IPropertyRepository, PropertyRepository>();
 
         // Services
+        services.AddScoped<IFileStorageService, R2FileStorageService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IActivityLogService, ActivityLogService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IDashboardService, DashboardService>();
+        services.AddScoped<IPropertyService, PropertyService>();
+
+        // Posting services
+        services.AddScoped<IPostService, PostService>();
+        services.AddScoped<IPostChannelService, PostChannelService>();
+        services.AddScoped<IPostAnalyticsService, PostAnalyticsService>();
+        services.AddScoped<IPostScheduleService, PostScheduleService>();
+        services.AddScoped<IAIContentService, AIContentService>();
 
 
         // FluentValidation — auto-scan tất cả validators từ Shared assembly

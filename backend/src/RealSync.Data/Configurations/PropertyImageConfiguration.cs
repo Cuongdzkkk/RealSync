@@ -11,9 +11,25 @@ public class PropertyImageConfiguration : IEntityTypeConfiguration<PropertyImage
         builder.ToTable("PropertyImages");
         builder.HasKey(e => e.Id);
 
+        builder.Property(e => e.FileName)
+            .IsRequired()
+            .HasMaxLength(255);
+
+        builder.Property(e => e.OriginalFileName)
+            .IsRequired()
+            .HasMaxLength(255);
+
+        builder.Property(e => e.FilePath)
+            .IsRequired()
+            .HasMaxLength(1000);
+
         builder.Property(e => e.Url)
             .IsRequired()
             .HasMaxLength(1000);
+
+        builder.Property(e => e.ContentType)
+            .IsRequired()
+            .HasMaxLength(100);
 
         builder.Property(e => e.Caption)
             .HasMaxLength(500);
@@ -24,6 +40,7 @@ public class PropertyImageConfiguration : IEntityTypeConfiguration<PropertyImage
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(e => e.PropertyId);
+        builder.HasIndex(e => new { e.PropertyId, e.IsThumbnail });
         builder.HasQueryFilter(e => !e.IsDeleted);
     }
 }

@@ -76,7 +76,8 @@ try
     var app = builder.Build();
 
     // ===== Database Migration & Seed (Development only) =====
-    if (app.Environment.IsDevelopment())
+    if (app.Environment.IsDevelopment() &&
+        app.Configuration.GetValue("Database:AutoMigrate", true))
     {
         using var scope = app.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<RealSyncDbContext>();
@@ -89,6 +90,7 @@ try
     app.UseMiddleware<ExceptionHandlingMiddleware>();
     app.UseMiddleware<SecurityHeadersMiddleware>();
     app.UseRateLimiter();
+    app.UseStaticFiles();
 
     if (app.Environment.IsDevelopment())
     {
@@ -110,7 +112,7 @@ try
     Log.Information("🚀 RealSync API started successfully");
     app.Run();
 }
-catch (Exception ex)
+catch (Exception ex) when (ex.GetType().Name != "HostAbortedException")
 {
     Log.Fatal(ex, "❌ Application terminated unexpectedly");
 }
