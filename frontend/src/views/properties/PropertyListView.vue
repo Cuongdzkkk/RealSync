@@ -6,6 +6,7 @@ import type { Property, PropertyStatus } from '@/types/property';
 import { PROPERTY_STATUSES } from '@/utils/constants';
 import { formatCurrency } from '@/utils/format';
 import PropertyCard from '@/components/property/PropertyCard.vue';
+import RoleGate from '@/components/common/RoleGate.vue';
 
 const propertyStore = usePropertyStore();
 const toastStore = useToastStore();
@@ -166,9 +167,10 @@ function handleFileUpload(event: Event) {
 </script>
 
 <template>
-  <div class="page">
-    <!-- Header Section -->
-    <div class="properties-header glass-card">
+  <RoleGate :roles="['Admin', 'Sales', 'Marketing']">
+    <div class="page">
+      <!-- Header Section -->
+      <div class="properties-header glass-card">
       <div class="header-main">
         <div>
           <h2>Kho Bất động sản</h2>
@@ -418,6 +420,7 @@ function handleFileUpload(event: Event) {
       </div>
     </div>
   </div>
+  </RoleGate>
 </template>
 
 <style scoped>

@@ -6,6 +6,7 @@ import type { Lead, LeadStage, LeadTemperature } from '@/types/lead';
 import { LEAD_STAGES } from '@/utils/constants';
 import { formatCurrency, formatDate } from '@/utils/format';
 import StatusBadge from '@/components/common/StatusBadge.vue';
+import RoleGate from '@/components/common/RoleGate.vue';
 
 const leadStore = useLeadStore();
 const toastStore = useToastStore();
@@ -161,9 +162,10 @@ function generateAiScript(lead: Lead) {
 </script>
 
 <template>
-  <div class="page">
-    <!-- Header Section -->
-    <div class="leads-header glass-card">
+  <RoleGate :roles="['Admin', 'Manager', 'Sales']">
+    <div class="page">
+      <!-- Header Section -->
+      <div class="leads-header glass-card">
       <div class="header-main">
         <div>
           <h2>Quản lý Khách hàng</h2>
@@ -507,6 +509,7 @@ function generateAiScript(lead: Lead) {
       </div>
     </div>
   </div>
+  </RoleGate>
 </template>
 
 <style scoped>
