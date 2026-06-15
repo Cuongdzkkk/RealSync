@@ -4,6 +4,7 @@ import { useProjectStore, type Project } from '@/stores/useProjectStore';
 import { useLeadStore } from '@/stores/useLeadStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { formatCurrency } from '@/utils/format';
+import RoleGate from '@/components/common/RoleGate.vue';
 
 const projectStore = useProjectStore();
 const leadStore = useLeadStore();
@@ -181,9 +182,10 @@ function deleteProjectItem(id: string, name: string) {
 </script>
 
 <template>
-  <div class="page">
-    <!-- Header Section -->
-    <div class="projects-header glass-card">
+  <RoleGate :roles="['Admin', 'Marketing']">
+    <div class="page">
+      <!-- Header Section -->
+      <div class="projects-header glass-card">
       <div class="header-main">
         <div>
           <h2>Danh sách Dự án</h2>
@@ -475,6 +477,7 @@ function deleteProjectItem(id: string, name: string) {
       </div>
     </div>
   </div>
+  </RoleGate>
 </template>
 
 <style scoped>

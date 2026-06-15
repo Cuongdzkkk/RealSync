@@ -130,8 +130,9 @@ function mapPostStatus(status: string): 'draft' | 'review' | 'approved' | 'publi
 </script>
 
 <template>
-  <div class="page">
-    <div class="workspace-grid">
+  <RoleGate :roles="['Admin', 'Sales', 'Marketing']">
+    <div class="page">
+      <div class="workspace-grid">
       <!-- Left Controls Panel -->
       <div class="panel-controls glass-card">
         <div class="panel-header">
@@ -389,6 +390,7 @@ function mapPostStatus(status: string): 'draft' | 'review' | 'approved' | 'publi
       </table>
     </div>
   </div>
+  </RoleGate>
 </template>
 
 <style scoped>

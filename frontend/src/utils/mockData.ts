@@ -238,6 +238,30 @@ export const mockUsers: WorkspaceUser[] = [
     lastSeenAt: '2026-05-24T08:18:00Z'
   },
   {
+    id: 'u-005',
+    fullName: 'Lê Thị Mai',
+    email: 'sales@realsync.vn',
+    role: 'Sales',
+    status: 'active',
+    lastSeenAt: '2026-05-24T07:30:00Z'
+  },
+  {
+    id: 'u-006',
+    fullName: 'Hoàng Văn Nam',
+    email: 'marketing@realsync.vn',
+    role: 'Marketing',
+    status: 'active',
+    lastSeenAt: '2026-05-23T17:15:00Z'
+  },
+  {
+    id: 'u-007',
+    fullName: 'Phan Minh Đức',
+    email: 'analyst@realsync.vn',
+    role: 'Data Analyst',
+    status: 'active',
+    lastSeenAt: '2026-05-24T06:45:00Z'
+  },
+  {
     id: 'u-003',
     fullName: 'Lê Mai Anh',
     email: 'mai@realsync.vn',
