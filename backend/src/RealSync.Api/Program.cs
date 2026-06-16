@@ -49,6 +49,10 @@ try
     // CORS
     builder.Services.AddCorsPolicy(builder.Configuration);
 
+    // AI Options (Gemini / OpenAI) — config trong appsettings.json
+    builder.Services.Configure<RealSync.Services.Options.AIOptions>(
+        builder.Configuration.GetSection("AI"));
+
     // Controllers with FluentValidation filter
     builder.Services.AddControllersWithValidation();
 

@@ -8,6 +8,7 @@ using RealSync.Api.Services;
 using RealSync.Core.Interfaces;
 using RealSync.Data.Repositories;
 using RealSync.Services.Implementations;
+using RealSync.Services.Options;
 
 namespace RealSync.Api.Extensions;
 
@@ -45,6 +46,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPostChannelService, PostChannelService>();
         services.AddScoped<IPostAnalyticsService, PostAnalyticsService>();
         services.AddScoped<IPostScheduleService, PostScheduleService>();
+        services.AddSingleton(new HttpClient()); // built-in, không cần cài gói
         services.AddScoped<IAIContentService, AIContentService>();
 
 
