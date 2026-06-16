@@ -29,6 +29,7 @@ public static class ServiceCollectionExtensions
         // Repositories
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IPropertyRepository, PropertyRepository>();
+        services.AddScoped<ILeadRepository, LeadRepository>();
 
         // Services
         services.AddScoped<IFileStorageService, R2FileStorageService>();
@@ -37,6 +38,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IPropertyService, PropertyService>();
+        services.AddScoped<ILeadService, LeadService>();
 
         // Posting services
         services.AddScoped<IPostService, PostService>();
