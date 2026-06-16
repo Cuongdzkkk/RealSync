@@ -65,30 +65,36 @@ const variantConfig: Record<string, { icon: unknown }> = {
   padding: 14px 16px;
   border-radius: 8px;
   border: 1px solid;
-  background: var(--color-surface-2);
-  box-shadow: var(--elevation-raised);
+  background-color: rgba(255, 255, 255, 0.98) !important;
+  box-shadow: var(--elevation-floating);
   pointer-events: auto;
   width: 100%;
+  backdrop-filter: blur(8px);
+}
+
+[data-theme="dark"] .toast,
+.dark .toast {
+  background-color: rgba(15, 23, 42, 0.98) !important;
 }
 
 .toast--success {
-  border-color: var(--color-success-border);
-  background: var(--color-success-bg);
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  background-image: linear-gradient(rgba(16, 185, 129, 0.07), rgba(16, 185, 129, 0.07)) !important;
 }
 
 .toast--warning {
-  border-color: var(--color-warning-border);
-  background: var(--color-warning-bg);
+  border-color: rgba(245, 158, 11, 0.4) !important;
+  background-image: linear-gradient(rgba(245, 158, 11, 0.07), rgba(245, 158, 11, 0.07)) !important;
 }
 
 .toast--error {
-  border-color: var(--color-danger-border);
-  background: var(--color-danger-bg);
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  background-image: linear-gradient(rgba(239, 68, 68, 0.07), rgba(239, 68, 68, 0.07)) !important;
 }
 
 .toast--info {
-  border-color: var(--color-info-border);
-  background: var(--color-info-bg);
+  border-color: rgba(59, 130, 246, 0.4) !important;
+  background-image: linear-gradient(rgba(59, 130, 246, 0.07), rgba(59, 130, 246, 0.07)) !important;
 }
 
 .toast-icon {

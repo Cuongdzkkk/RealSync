@@ -11,3 +11,15 @@ export const requireAuth: NavigationGuard = () => {
 
   return true;
 };
+
+export const requireRole: NavigationGuard = (to) => {
+  const allowedRoles = to.meta.roles;
+  if (!allowedRoles || allowedRoles.length === 0) return true;
+
+  const authStore = useAuthStore();
+  if (!authStore.user || !allowedRoles.includes(authStore.user.role)) {
+    return { name: 'unauthorized' };
+  }
+
+  return true;
+};

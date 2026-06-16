@@ -90,7 +90,8 @@ RealSync/
 ├── [M5] AI Classification    → Phân loại tự động (loại BĐS, khu vực, giá)
 ├── [M6] Content AI Engine    → Sinh mô tả, SEO content, social post
 ├── [M7] Dashboard & Insight  → Báo cáo, KPI, phân tích thị trường
-└── [M8] DevOps/Deploy        → CI/CD, monitoring, infrastructure
+├── [M8] DevOps/Deploy        → CI/CD, monitoring, infrastructure
+└── [M9] Posting Management   → Quản lý đăng bài BĐS đa kênh
 ```
 
 ### Module Priority (MVP)
@@ -99,6 +100,7 @@ RealSync/
 | 🔴 P0 | M1 Data Engine | MVP |
 | 🔴 P0 | M2 Product Management | MVP |
 | 🔴 P0 | M3 Lead Management | MVP |
+| 🔴 P0 | M9 Posting Management | MVP |
 | 🟡 P1 | M4 Crawler Engine | Phase 2 |
 | 🟡 P1 | M5 AI Classification | Phase 2 |
 | 🟢 P2 | M6 Content AI Engine | Phase 3 |

@@ -5,6 +5,13 @@ import type { LoginRequest, UserProfile } from '@/types/auth';
 import { authService } from '@/services/authService';
 
 const storageKey = 'realsync.accessToken';
+const userStorageKey = 'realsync.user';
+
+function loadUser(): UserProfile | null {
+  const raw = localStorage.getItem(userStorageKey);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref(localStorage.getItem(storageKey));
@@ -38,6 +45,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null;
     localStorage.removeItem(storageKey);
     localStorage.removeItem('realsync.refreshToken');
+    localStorage.removeItem(userStorageKey);
   };
 
   return {

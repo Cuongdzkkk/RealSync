@@ -17,6 +17,7 @@ public static class DataSeeder
         await SeedPropertyTypesAsync(context);
         await SeedAreasAsync(context);
         await SeedPermissionsAsync(context);
+        await SeedPostingPermissionsAsync(context);
         await SeedAdminUserAsync(context);
 
         await context.SaveChangesAsync();
@@ -32,6 +33,7 @@ public static class DataSeeder
             new Role { Name = "Manager", Description = "Quản lý" },
             new Role { Name = "Agent", Description = "Nhân viên kinh doanh" },
             new Role { Name = "Viewer", Description = "Người xem" },
+            new Role { Name = "Marketing", Description = "Nhân viên marketing" },
         };
 
         context.Roles.AddRange(roles);
@@ -243,5 +245,60 @@ public static class DataSeeder
             .ToListAsync();
 
         context.Users.AddRange(users.Where(u => !existingEmails.Contains(u.Email)));
+    }
+
+    private static async Task SeedPostingPermissionsAsync(RealSyncDbContext context)
+    {
+        // Chỉ seed nếu chưa có posting permissions
+        if (await context.Permissions.AnyAsync(p => p.Group == "posts")) return;
+
+        var postingPermissions = new List<Permission>
+        {
+            new() { Name = "posts.read", Group = "posts", Description = "Xem bài đăng" },
+            new() { Name = "posts.create", Group = "posts", Description = "Tạo bài đăng" },
+            new() { Name = "posts.update", Group = "posts", Description = "Cập nhật bài đăng" },
+            new() { Name = "posts.delete", Group = "posts", Description = "Xóa bài đăng" },
+            new() { Name = "posts.publish", Group = "posts", Description = "Đăng bài lên kênh" },
+        };
+
+        context.Permissions.AddRange(postingPermissions);
+        await context.SaveChangesAsync();
+
+        // Gán permissions cho roles
+        var admin = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Admin");
+        var manager = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Manager");
+        var agent = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Agent");
+        var marketing = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Marketing");
+
+        var allPostPerms = await context.Permissions.Where(p => p.Group == "posts").ToListAsync();
+
+        // Admin: tất cả quyền posting
+        if (admin != null)
+        {
+            foreach (var perm in allPostPerms)
+                context.RolePermissions.Add(new RolePermission { RoleId = admin.Id, PermissionId = perm.Id });
+        }
+
+        // Manager: tất cả quyền posting
+        if (manager != null)
+        {
+            foreach (var perm in allPostPerms)
+                context.RolePermissions.Add(new RolePermission { RoleId = manager.Id, PermissionId = perm.Id });
+        }
+
+        // Agent (Sales): read, create, update
+        if (agent != null)
+        {
+            var agentPostPerms = new[] { "posts.read", "posts.create", "posts.update" };
+            foreach (var perm in allPostPerms.Where(p => agentPostPerms.Contains(p.Name)))
+                context.RolePermissions.Add(new RolePermission { RoleId = agent.Id, PermissionId = perm.Id });
+        }
+
+        // Marketing: tất cả quyền posting
+        if (marketing != null)
+        {
+            foreach (var perm in allPostPerms)
+                context.RolePermissions.Add(new RolePermission { RoleId = marketing.Id, PermissionId = perm.Id });
+        }
     }
 }

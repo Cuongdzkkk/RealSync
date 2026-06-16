@@ -6,4 +6,7 @@
     <Project Path="src/RealSync.Services/RealSync.Services.csproj" />
     <Project Path="src/RealSync.Shared/RealSync.Shared.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RealSync.UnitTests/RealSync.UnitTests.csproj" />
+  </Folder>
 </Solution>
