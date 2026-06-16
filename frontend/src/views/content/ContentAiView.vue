@@ -4,6 +4,7 @@ import { usePropertyStore } from '@/stores/usePropertyStore';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { usePostStore } from '@/stores/usePostStore';
+import RoleGate from '@/components/common/RoleGate.vue';
 
 const propertyStore = usePropertyStore();
 const projectStore = useProjectStore();

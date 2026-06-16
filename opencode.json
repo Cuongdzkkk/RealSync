@@ -1,0 +1,53 @@
+﻿{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "planner",
+  "model": "opencode/deepseek-v4-flash-free",
+  "small_model": "opencode/deepseek-v4-flash-free",
+  "instructions": ["AGENTS.md", "agent-skills/SKILL.md"],
+  "skills": {
+    "paths": ["agent-skills"]
+  },
+  "permission": {
+    "edit": "allow",
+    "bash": {
+      "git status *": "allow",
+      "git log *": "allow",
+      "git diff *": "allow",
+      "git show *": "allow",
+      "git branch *": "allow",
+      "git add *": "allow",
+      "git commit *": "allow",
+      "git checkout *": "allow",
+      "git switch *": "allow",
+      "git merge *": "allow",
+      "git pull *": "allow",
+      "git push *": "ask",
+      "git push --force *": "deny",
+      "git push -f *": "deny",
+      "git reset --hard *": "deny",
+      "git rebase *": "deny",
+      "git clean *": "deny",
+      "dotnet *": "allow",
+      "npm *": "allow",
+      "npx *": "allow",
+      "node *": "allow",
+      "dir *": "allow",
+      "ls *": "allow",
+      "type *": "allow",
+      "cat *": "allow",
+      "findstr *": "allow",
+      "find *": "allow",
+      "mkdir *": "allow",
+      "echo *": "allow",
+      "cp *": "allow",
+      "copy *": "allow",
+      "move *": "allow",
+      "cd *": "allow",
+      "del *": "deny",
+      "rm *": "deny",
+      "rmdir *": "deny",
+      "Remove-Item *": "deny",
+      "*": "deny"
+    }
+  }
+}

@@ -24,7 +24,9 @@ export const postingService = {
 
   /** Sinh nội dung AI cho bài đăng */
   async generateContent(postId: string, request: AIContentGenerateRequest): Promise<AIContentGeneration> {
-    const { data } = await api.post(`/posts/${postId}/ai-content/generate`, request);
+    const { data } = await api.post(`/posts/${postId}/ai-content/generate`, request, {
+      timeout: 120000
+    });
     return data.data;
   },
 
