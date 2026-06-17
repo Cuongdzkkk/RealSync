@@ -83,4 +83,75 @@ public class LeadsControllerTests
         noContent.StatusCode.Should().Be(204);
         service.Verify(s => s.DeleteLeadAsync(id), Times.Once);
     }
+
+    [Test]
+    public async Task UpdateStatus_ShouldReturnOkResponse()
+    {
+        var id = Guid.NewGuid();
+        var service = new Mock<ILeadService>();
+        service.Setup(s => s.UpdateStatusAsync(id, It.IsAny<LeadStatusUpdateDto>()))
+            .ReturnsAsync(new LeadResponseDto { Id = id, Status = "Contacted" });
+        var controller = new LeadsController(service.Object);
+
+        var result = await controller.UpdateStatus(id, new LeadStatusUpdateDto { Status = "Contacted" });
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Test]
+    public async Task AssignLead_ShouldReturnOkResponse()
+    {
+        var id = Guid.NewGuid();
+        var service = new Mock<ILeadService>();
+        service.Setup(s => s.AssignLeadAsync(id, It.IsAny<LeadAssignDto>()))
+            .ReturnsAsync(new LeadResponseDto { Id = id, AssignedToId = Guid.NewGuid() });
+        var controller = new LeadsController(service.Object);
+
+        var result = await controller.AssignLead(id, new LeadAssignDto { AssignedToId = Guid.NewGuid() });
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Test]
+    public async Task AddActivity_ShouldReturnCreatedResponse()
+    {
+        var id = Guid.NewGuid();
+        var service = new Mock<ILeadService>();
+        service.Setup(s => s.AddActivityAsync(id, It.IsAny<LeadActivityCreateDto>()))
+            .ReturnsAsync(new LeadActivityDto { Id = Guid.NewGuid(), ActivityType = "Call" });
+        var controller = new LeadsController(service.Object);
+
+        var result = await controller.AddActivity(id, new LeadActivityCreateDto { ActivityType = "Call" });
+
+        var created = result.Should().BeOfType<ObjectResult>().Subject;
+        created.StatusCode.Should().Be(201);
+    }
+
+    [Test]
+    public async Task GetActivities_ShouldReturnOkResponse()
+    {
+        var id = Guid.NewGuid();
+        var service = new Mock<ILeadService>();
+        service.Setup(s => s.GetActivitiesAsync(id))
+            .ReturnsAsync(new List<LeadActivityDto> { new() { Id = Guid.NewGuid(), ActivityType = "Call" } });
+        var controller = new LeadsController(service.Object);
+
+        var result = await controller.GetActivities(id);
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Test]
+    public async Task SetFollowUp_ShouldReturnOkResponse()
+    {
+        var id = Guid.NewGuid();
+        var service = new Mock<ILeadService>();
+        service.Setup(s => s.SetFollowUpAsync(id, It.IsAny<LeadFollowUpDto>()))
+            .ReturnsAsync(new LeadResponseDto { Id = id, NextFollowUpAt = DateTime.UtcNow.AddDays(1) });
+        var controller = new LeadsController(service.Object);
+
+        var result = await controller.SetFollowUp(id, new LeadFollowUpDto { NextFollowUpAt = DateTime.UtcNow.AddDays(1) });
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
 }

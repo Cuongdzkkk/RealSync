@@ -69,4 +69,81 @@ public class LeadRepositoryTests
         deleted.IsDeleted.Should().BeTrue();
         deleted.DeletedAt.Should().NotBeNull();
     }
+
+    [Test]
+    public async Task AddActivityAsync_ShouldPersistActivity()
+    {
+        await using var context = LeadTestFactory.CreateContext();
+        var lead = LeadTestFactory.Lead("Activity Lead");
+        context.Leads.Add(lead);
+        await context.SaveChangesAsync();
+
+        var activity = await new LeadRepository(context).AddActivityAsync(new()
+        {
+            LeadId = lead.Id,
+            ActivityType = "Call",
+            Description = "Called"
+        });
+
+        activity.Id.Should().NotBeEmpty();
+        (await context.LeadActivities.CountAsync(a => a.LeadId == lead.Id)).Should().Be(1);
+    }
+
+    [Test]
+    public async Task GetActivitiesAsync_ShouldReturnActivitiesByLeadIdOnlyAndOrderDesc()
+    {
+        await using var context = LeadTestFactory.CreateContext();
+        var lead = LeadTestFactory.Lead("Activity Lead");
+        var otherLead = LeadTestFactory.Lead("Other Lead");
+        context.Leads.AddRange(lead, otherLead);
+        context.LeadActivities.AddRange(
+            new() { LeadId = lead.Id, ActivityType = "Note", CreatedAt = DateTime.UtcNow.AddDays(-1) },
+            new() { LeadId = lead.Id, ActivityType = "Call", CreatedAt = DateTime.UtcNow },
+            new() { LeadId = otherLead.Id, ActivityType = "Email", CreatedAt = DateTime.UtcNow.AddDays(1) });
+        await context.SaveChangesAsync();
+
+        var activities = await new LeadRepository(context).GetActivitiesAsync(lead.Id);
+
+        activities.Should().HaveCount(2);
+        activities.Should().OnlyContain(a => a.LeadId == lead.Id);
+        activities.Select(a => a.CreatedAt).Should().BeInDescendingOrder();
+    }
+
+    [Test]
+    public async Task GetPagedAsync_OverdueFollowUp_ShouldReturnOnlyOverdueLeads()
+    {
+        await using var context = LeadTestFactory.CreateContext();
+        var overdue = LeadTestFactory.Lead("Overdue");
+        overdue.NextFollowUpAt = DateTime.UtcNow.AddDays(-1);
+        var future = LeadTestFactory.Lead("Future");
+        future.NextFollowUpAt = DateTime.UtcNow.AddDays(1);
+        var won = LeadTestFactory.Lead("Won", "Won");
+        won.NextFollowUpAt = DateTime.UtcNow.AddDays(-1);
+        context.Leads.AddRange(overdue, future, won);
+        await context.SaveChangesAsync();
+
+        var result = await new LeadRepository(context).GetPagedAsync(new LeadQueryDto { OverdueFollowUp = true });
+
+        result.Items.Should().ContainSingle(x => x.Id == overdue.Id);
+    }
+
+    [Test]
+    public async Task GetPagedAsync_FollowUpRange_ShouldFilterByNextFollowUpAt()
+    {
+        await using var context = LeadTestFactory.CreateContext();
+        var inRange = LeadTestFactory.Lead("In Range");
+        inRange.NextFollowUpAt = DateTime.UtcNow.AddDays(2);
+        var outRange = LeadTestFactory.Lead("Out Range");
+        outRange.NextFollowUpAt = DateTime.UtcNow.AddDays(5);
+        context.Leads.AddRange(inRange, outRange);
+        await context.SaveChangesAsync();
+
+        var result = await new LeadRepository(context).GetPagedAsync(new LeadQueryDto
+        {
+            FollowUpFrom = DateTime.UtcNow.AddDays(1),
+            FollowUpTo = DateTime.UtcNow.AddDays(3)
+        });
+
+        result.Items.Should().ContainSingle(x => x.Id == inRange.Id);
+    }
 }

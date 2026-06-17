@@ -10,4 +10,9 @@ public interface ILeadService
     Task<LeadResponseDto> CreateLeadAsync(LeadCreateDto dto);
     Task<LeadResponseDto> UpdateLeadAsync(Guid id, LeadUpdateDto dto);
     Task DeleteLeadAsync(Guid id);
+    Task<LeadResponseDto> UpdateStatusAsync(Guid id, LeadStatusUpdateDto dto);
+    Task<LeadResponseDto> AssignLeadAsync(Guid id, LeadAssignDto dto);
+    Task<LeadActivityDto> AddActivityAsync(Guid id, LeadActivityCreateDto dto);
+    Task<IReadOnlyList<LeadActivityDto>> GetActivitiesAsync(Guid id);
+    Task<LeadResponseDto> SetFollowUpAsync(Guid id, LeadFollowUpDto dto);
 }
