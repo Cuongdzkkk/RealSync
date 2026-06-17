@@ -17,7 +17,7 @@ const pageTitle = computed(() => route.meta.title as string || 'RealSync');
 const notifCount = ref(3);
 const showRoleDropdown = ref(false);
 
-const availableRoles = ['Admin', 'Manager', 'Sales', 'Marketing', 'Data Analyst'] as const;
+const availableRoles = ['Admin', 'Manager', 'Sales', 'Agent', 'Viewer', 'Marketing', 'Data Analyst'] as const;
 
 function switchRole(role: typeof availableRoles[number]) {
   if (authStore.user) {
@@ -28,6 +28,10 @@ function switchRole(role: typeof availableRoles[number]) {
       authStore.user.fullName = 'Trần Kinh Doanh (Manager)';
     } else if (role === 'Sales') {
       authStore.user.fullName = 'Lê Thị Sales (Sales)';
+    } else if (role === 'Agent') {
+      authStore.user.fullName = 'Phạm Ngọc Agent (Agent)';
+    } else if (role === 'Viewer') {
+      authStore.user.fullName = 'Vũ Viewer (Viewer)';
     } else if (role === 'Marketing') {
       authStore.user.fullName = 'Hoàng Quảng Cáo (Marketing)';
     } else {
