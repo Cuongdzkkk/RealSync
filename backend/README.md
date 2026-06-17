@@ -23,6 +23,12 @@ dotnet restore
 dotnet run
 ```
 
+From the `backend/` directory, run the API with:
+
+```bash
+dotnet run --project src/RealSync.Api/RealSync.Api.csproj
+```
+
 ## API Docs
 - Swagger: `https://localhost:5001/swagger`
 

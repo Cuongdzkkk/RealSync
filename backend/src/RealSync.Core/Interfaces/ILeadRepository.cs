@@ -12,4 +12,7 @@ public interface ILeadRepository
     Task UpdateAsync(Lead lead);
     Task DeleteAsync(Lead lead);
     Task<bool> ExistsAsync(Guid id);
+    Task<LeadActivity> AddActivityAsync(LeadActivity activity);
+    Task<IReadOnlyList<LeadActivity>> GetActivitiesAsync(Guid leadId);
+    Task<bool> HasLeadAsync(Guid leadId);
 }

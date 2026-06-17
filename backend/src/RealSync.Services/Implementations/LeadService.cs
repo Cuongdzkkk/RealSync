@@ -5,6 +5,7 @@ using RealSync.Core.Enums;
 using RealSync.Core.Interfaces;
 using RealSync.Data.Context;
 using RealSync.Shared.DTOs.Requests.Leads;
+using RealSync.Shared.DTOs.Responses.Customers;
 using RealSync.Shared.DTOs.Responses.Leads;
 using RealSync.Shared.Exceptions;
 using ValidationException = RealSync.Shared.Exceptions.ValidationException;
@@ -32,19 +33,28 @@ public class LeadService : ILeadService
     };
 
     private readonly ILeadRepository _leadRepository;
+    private readonly ICustomerRepository _customerRepository;
     private readonly RealSyncDbContext _context;
     private readonly IActivityLogService _activityLogService;
+    private readonly INotificationService _notificationService;
+    private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<LeadService> _logger;
 
     public LeadService(
         ILeadRepository leadRepository,
+        ICustomerRepository customerRepository,
         RealSyncDbContext context,
         IActivityLogService activityLogService,
+        INotificationService notificationService,
+        ICurrentUserService currentUserService,
         ILogger<LeadService> logger)
     {
         _leadRepository = leadRepository;
+        _customerRepository = customerRepository;
         _context = context;
         _activityLogService = activityLogService;
+        _notificationService = notificationService;
+        _currentUserService = currentUserService;
         _logger = logger;
     }
 
@@ -185,6 +195,204 @@ public class LeadService : ILeadService
         await TryLogAsync(lead.Id, ActivityType.Delete, "Deleted lead", lead, null);
     }
 
+    public async Task<LeadResponseDto> UpdateStatusAsync(Guid id, LeadStatusUpdateDto dto)
+    {
+        var lead = await _leadRepository.GetByIdAsync(id)
+            ?? throw new NotFoundException("Lead", id);
+
+        var oldStatus = lead.Status;
+        var newStatus = NormalizeStatus(dto.Status);
+        var note = NormalizeOptional(dto.Note);
+
+        if (string.Equals(oldStatus, newStatus, StringComparison.Ordinal) && note == null)
+            return MapResponse(lead);
+
+        lead.Status = newStatus;
+        if (newStatus == "Won" && lead.ConvertedAt == null)
+            lead.ConvertedAt = DateTime.UtcNow;
+
+        await _leadRepository.UpdateAsync(lead);
+        await AddSystemActivityAsync(
+            lead.Id,
+            "StatusChange",
+            note ?? $"Changed status from {oldStatus} to {newStatus}",
+            oldStatus,
+            newStatus);
+        await TryLogAsync(lead.Id, ActivityType.Update, "Updated lead status", new { Status = oldStatus }, new { Status = newStatus });
+
+        return MapResponse(lead);
+    }
+
+    public async Task<LeadResponseDto> AssignLeadAsync(Guid id, LeadAssignDto dto)
+    {
+        var lead = await _leadRepository.GetByIdAsync(id)
+            ?? throw new NotFoundException("Lead", id);
+
+        await EnsureActiveUserExistsAsync(dto.AssignedToId);
+
+        var oldAssignedToId = lead.AssignedToId;
+        lead.AssignedToId = dto.AssignedToId;
+
+        await _leadRepository.UpdateAsync(lead);
+        await AddSystemActivityAsync(
+            lead.Id,
+            "Assigned",
+            NormalizeOptional(dto.Note) ?? "Assigned lead to user",
+            oldAssignedToId?.ToString(),
+            dto.AssignedToId.ToString());
+        await TrySendNotificationAsync(
+            dto.AssignedToId,
+            "Bạn được giao lead mới",
+            $"Lead {lead.FullName} đã được giao cho bạn xử lý.",
+            NotificationType.Assignment,
+            $"/leads/{lead.Id}",
+            new { leadId = lead.Id, fullName = lead.FullName, assignedToId = dto.AssignedToId });
+        await TryLogAsync(lead.Id, ActivityType.Assignment, "Assigned lead", new { AssignedToId = oldAssignedToId }, new { dto.AssignedToId });
+
+        return MapResponse(lead);
+    }
+
+    public async Task<LeadActivityDto> AddActivityAsync(Guid id, LeadActivityCreateDto dto)
+    {
+        var lead = await _leadRepository.GetByIdAsync(id)
+            ?? throw new NotFoundException("Lead", id);
+
+        var activityType = NormalizeClientActivityType(dto.ActivityType);
+        var description = NormalizeOptional(dto.Description);
+
+        if (activityType == "Note" && description == null)
+            throw new ValidationException("description", "Ghi chú nội bộ cần có nội dung.");
+
+        if (activityType is "Call" or "Email" or "Meeting")
+        {
+            lead.LastContactedAt = DateTime.UtcNow;
+            await _leadRepository.UpdateAsync(lead);
+        }
+
+        var activity = await _leadRepository.AddActivityAsync(new LeadActivity
+        {
+            LeadId = id,
+            ActivityType = activityType,
+            Description = description,
+            PerformedById = _currentUserService.UserId
+        });
+
+        await TryLogAsync(id, ActivityType.Update, $"Added lead activity: {activityType}", null, activity);
+        return MapActivity(activity);
+    }
+
+    public async Task<IReadOnlyList<LeadActivityDto>> GetActivitiesAsync(Guid id)
+    {
+        if (!await _leadRepository.HasLeadAsync(id))
+            throw new NotFoundException("Lead", id);
+
+        var activities = await _leadRepository.GetActivitiesAsync(id);
+        return activities.Select(MapActivity).ToList();
+    }
+
+    public async Task<LeadResponseDto> SetFollowUpAsync(Guid id, LeadFollowUpDto dto)
+    {
+        var lead = await _leadRepository.GetByIdAsync(id)
+            ?? throw new NotFoundException("Lead", id);
+
+        if (dto.NextFollowUpAt <= DateTime.UtcNow)
+            throw new ValidationException("nextFollowUpAt", "Thời gian chăm sóc tiếp theo phải ở tương lai.");
+
+        var oldFollowUpAt = lead.NextFollowUpAt;
+        lead.NextFollowUpAt = dto.NextFollowUpAt;
+
+        await _leadRepository.UpdateAsync(lead);
+        await AddSystemActivityAsync(
+            lead.Id,
+            "FollowUp",
+            NormalizeOptional(dto.Note) ?? $"Set next follow-up at {dto.NextFollowUpAt:O}",
+            oldFollowUpAt?.ToString("O"),
+            dto.NextFollowUpAt.ToString("O"));
+
+        if (lead.AssignedToId.HasValue)
+        {
+            await TrySendNotificationAsync(
+                lead.AssignedToId.Value,
+                "Lịch chăm sóc lead",
+                $"Lead {lead.FullName} có lịch chăm sóc vào {dto.NextFollowUpAt:O}.",
+                NotificationType.Lead,
+                $"/leads/{lead.Id}",
+                new { leadId = lead.Id, nextFollowUpAt = dto.NextFollowUpAt });
+        }
+
+        await TryLogAsync(lead.Id, ActivityType.Update, "Updated lead follow-up", new { NextFollowUpAt = oldFollowUpAt }, new { dto.NextFollowUpAt });
+        return MapResponse(lead);
+    }
+
+    public async Task<CustomerResponseDto> ConvertToCustomerAsync(Guid id, LeadConvertToCustomerDto dto)
+    {
+        var lead = await _leadRepository.GetByIdAsync(id)
+            ?? throw new NotFoundException("Lead", id);
+
+        if (await _customerRepository.ExistsByConvertedLeadIdAsync(id))
+            throw new ValidationException("leadId", "Lead đã được chuyển thành khách hàng.");
+
+        var fullName = NormalizeOptional(dto.FullName) ?? lead.FullName;
+        var phone = NormalizeOptional(dto.Phone) ?? lead.Phone;
+        var email = NormalizeOptional(dto.Email) ?? lead.Email;
+        var assignedToId = dto.AssignedToId ?? lead.AssignedToId;
+
+        if (string.IsNullOrWhiteSpace(fullName))
+            throw new ValidationException("fullName", "Tên khách hàng không được để trống.");
+
+        if (string.IsNullOrWhiteSpace(phone) && string.IsNullOrWhiteSpace(email))
+            throw new ValidationException("contact", "Khách hàng phải có số điện thoại hoặc email.");
+
+        if (assignedToId.HasValue)
+            await EnsureActiveUserExistsAsync(assignedToId.Value);
+
+        var customer = new Customer
+        {
+            FullName = fullName.Trim(),
+            Phone = phone,
+            Email = email,
+            Address = NormalizeOptional(dto.Address),
+            Company = NormalizeOptional(dto.Company),
+            Notes = NormalizeOptional(dto.Notes) ?? lead.Requirements,
+            Source = NormalizeOptional(dto.Source) ?? lead.SourceChannel,
+            AssignedToId = assignedToId,
+            ConvertedFromLeadId = lead.Id
+        };
+
+        await _customerRepository.CreateAsync(customer);
+
+        var oldStatus = lead.Status;
+        if (lead.Status != "Won")
+            lead.Status = "Won";
+
+        if (lead.ConvertedAt == null)
+            lead.ConvertedAt = DateTime.UtcNow;
+
+        await _leadRepository.UpdateAsync(lead);
+
+        if (oldStatus != lead.Status)
+        {
+            await AddSystemActivityAsync(
+                lead.Id,
+                "StatusChange",
+                "Lead converted to customer",
+                oldStatus,
+                lead.Status);
+        }
+
+        await AddSystemActivityAsync(
+            lead.Id,
+            "Converted",
+            "Converted lead to customer",
+            lead.Id.ToString(),
+            customer.Id.ToString());
+
+        await TryLogAsync(lead.Id, ActivityType.Update, "Converted lead to customer", new { Status = oldStatus }, new { lead.Status, CustomerId = customer.Id });
+        await TryLogCustomerAsync(customer.Id, ActivityType.Create, "Created customer from lead", null, customer);
+
+        return MapCustomerResponse(customer);
+    }
+
     private async Task EnsurePropertyExistsAsync(Guid propertyId)
     {
         if (!await _context.Properties.AnyAsync(p => p.Id == propertyId))
@@ -206,6 +414,54 @@ public class LeadService : ILeadService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to write activity log for lead {LeadId}", leadId);
+        }
+    }
+
+    private async Task TryLogCustomerAsync(Guid customerId, ActivityType action, string description, object? oldValues, object? newValues)
+    {
+        try
+        {
+            await _activityLogService.LogAsync("Customer", customerId, action, description, oldValues, newValues);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to write activity log for customer {CustomerId}", customerId);
+        }
+    }
+
+    private async Task<LeadActivity> AddSystemActivityAsync(
+        Guid leadId,
+        string activityType,
+        string description,
+        string? oldValue,
+        string? newValue)
+    {
+        return await _leadRepository.AddActivityAsync(new LeadActivity
+        {
+            LeadId = leadId,
+            ActivityType = activityType,
+            Description = description,
+            OldValue = oldValue,
+            NewValue = newValue,
+            PerformedById = _currentUserService.UserId
+        });
+    }
+
+    private async Task TrySendNotificationAsync(
+        Guid userId,
+        string title,
+        string message,
+        NotificationType type,
+        string? link,
+        object? data)
+    {
+        try
+        {
+            await _notificationService.SendAsync(userId, title, message, type, link, data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send lead notification to user {UserId}", userId);
         }
     }
 
@@ -294,6 +550,25 @@ public class LeadService : ILeadService
         };
     }
 
+    private static CustomerResponseDto MapCustomerResponse(Customer customer)
+    {
+        return new CustomerResponseDto
+        {
+            Id = customer.Id,
+            FullName = customer.FullName,
+            Phone = customer.Phone,
+            Email = customer.Email,
+            Address = customer.Address,
+            Company = customer.Company,
+            Notes = customer.Notes,
+            Source = customer.Source,
+            AssignedToId = customer.AssignedToId,
+            ConvertedFromLeadId = customer.ConvertedFromLeadId,
+            CreatedAt = customer.CreatedAt,
+            UpdatedAt = customer.UpdatedAt
+        };
+    }
+
     private static LeadActivityDto MapActivity(LeadActivity activity)
     {
         return new LeadActivityDto
@@ -334,6 +609,22 @@ public class LeadService : ILeadService
             return normalized;
 
         throw new ValidationException("priority", "Mức ưu tiên lead không hợp lệ.");
+    }
+
+    private static string NormalizeClientActivityType(string? activityType)
+    {
+        if (string.IsNullOrWhiteSpace(activityType))
+            throw new ValidationException("activityType", "Loại hoạt động không được để trống.");
+
+        var trimmed = activityType.Trim();
+        return trimmed.ToLowerInvariant() switch
+        {
+            "call" => "Call",
+            "email" => "Email",
+            "meeting" => "Meeting",
+            "note" => "Note",
+            _ => throw new ValidationException("activityType", "Loại hoạt động lead không hợp lệ.")
+        };
     }
 
     private static string NormalizeRequired(string value, string field, string message)

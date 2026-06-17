@@ -31,6 +31,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IPropertyRepository, PropertyRepository>();
         services.AddScoped<ILeadRepository, LeadRepository>();
+        services.AddScoped<ICustomerRepository, CustomerRepository>();
 
         // Services
         services.AddScoped<IFileStorageService, R2FileStorageService>();
@@ -38,8 +39,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IActivityLogService, ActivityLogService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IDashboardService, DashboardService>();
+        services.AddScoped<ICrmAnalyticsService, CrmAnalyticsService>();
         services.AddScoped<IPropertyService, PropertyService>();
         services.AddScoped<ILeadService, LeadService>();
+        services.AddScoped<ICustomerService, CustomerService>();
 
         // Posting services
         services.AddScoped<IPostService, PostService>();

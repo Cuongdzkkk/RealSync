@@ -68,6 +68,22 @@ public class LeadRepository : ILeadRepository
         if (query.ToDate.HasValue)
             leads = leads.Where(l => l.CreatedAt <= query.ToDate.Value);
 
+        if (query.OverdueFollowUp == true)
+        {
+            var now = DateTime.UtcNow;
+            leads = leads.Where(l =>
+                l.NextFollowUpAt.HasValue &&
+                l.NextFollowUpAt.Value < now &&
+                l.Status != "Won" &&
+                l.Status != "Lost");
+        }
+
+        if (query.FollowUpFrom.HasValue)
+            leads = leads.Where(l => l.NextFollowUpAt >= query.FollowUpFrom.Value);
+
+        if (query.FollowUpTo.HasValue)
+            leads = leads.Where(l => l.NextFollowUpAt <= query.FollowUpTo.Value);
+
         var totalCount = await leads.CountAsync();
         leads = ApplySorting(leads, query.SortBy, query.SortDirection);
 
@@ -118,6 +134,33 @@ public class LeadRepository : ILeadRepository
     public async Task<bool> ExistsAsync(Guid id)
     {
         return await _context.Leads.AnyAsync(l => l.Id == id);
+    }
+
+    public async Task<LeadActivity> AddActivityAsync(LeadActivity activity)
+    {
+        await _context.LeadActivities.AddAsync(activity);
+        await _context.SaveChangesAsync();
+
+        await _context.Entry(activity)
+            .Reference(a => a.PerformedBy)
+            .LoadAsync();
+
+        return activity;
+    }
+
+    public async Task<IReadOnlyList<LeadActivity>> GetActivitiesAsync(Guid leadId)
+    {
+        return await _context.LeadActivities
+            .AsNoTracking()
+            .Include(a => a.PerformedBy)
+            .Where(a => a.LeadId == leadId)
+            .OrderByDescending(a => a.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task<bool> HasLeadAsync(Guid leadId)
+    {
+        return await _context.Leads.AnyAsync(l => l.Id == leadId);
     }
 
     private static IQueryable<Lead> ApplySorting(

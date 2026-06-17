@@ -20,14 +20,23 @@ internal static class LeadTestFactory
         return new RealSyncDbContext(options);
     }
 
-    public static LeadService CreateService(RealSyncDbContext context)
+    public static LeadService CreateService(
+        RealSyncDbContext context,
+        Mock<INotificationService>? notificationService = null,
+        Mock<ICurrentUserService>? currentUserService = null,
+        Mock<IActivityLogService>? activityLogService = null)
     {
-        var activityLog = new Mock<IActivityLogService>();
+        activityLogService ??= new Mock<IActivityLogService>();
+        notificationService ??= new Mock<INotificationService>();
+        currentUserService ??= new Mock<ICurrentUserService>();
 
         return new LeadService(
             new LeadRepository(context),
+            new CustomerRepository(context),
             context,
-            activityLog.Object,
+            activityLogService.Object,
+            notificationService.Object,
+            currentUserService.Object,
             NullLogger<LeadService>.Instance);
     }
 

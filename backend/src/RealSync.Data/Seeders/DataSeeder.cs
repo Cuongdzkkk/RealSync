@@ -18,6 +18,7 @@ public static class DataSeeder
         await SeedAreasAsync(context);
         await SeedPermissionsAsync(context);
         await SeedPostingPermissionsAsync(context);
+        await SeedNotificationPermissionsAsync(context);
         await SeedAdminUserAsync(context);
 
         await context.SaveChangesAsync();
@@ -299,6 +300,62 @@ public static class DataSeeder
         {
             foreach (var perm in allPostPerms)
                 context.RolePermissions.Add(new RolePermission { RoleId = marketing.Id, PermissionId = perm.Id });
+        }
+    }
+
+    private static async Task SeedNotificationPermissionsAsync(RealSyncDbContext context)
+    {
+        var notificationPermissions = new[]
+        {
+            new Permission { Name = "notifications.read", Group = "notifications", Description = "Xem thông báo" },
+            new Permission { Name = "notifications.update", Group = "notifications", Description = "Cập nhật trạng thái thông báo" },
+            new Permission { Name = "notifications.delete", Group = "notifications", Description = "Xóa thông báo" },
+        };
+
+        var existingPermissionNames = await context.Permissions
+            .Where(p => p.Group == "notifications")
+            .Select(p => p.Name)
+            .ToListAsync();
+
+        var missingPermissions = notificationPermissions
+            .Where(p => !existingPermissionNames.Contains(p.Name))
+            .ToList();
+
+        if (missingPermissions.Count > 0)
+        {
+            context.Permissions.AddRange(missingPermissions);
+            await context.SaveChangesAsync();
+        }
+
+        var allNotificationPermissions = await context.Permissions
+            .Where(p => p.Group == "notifications")
+            .ToListAsync();
+
+        var rolePermissions = new Dictionary<string, string[]>
+        {
+            ["Admin"] = new[] { "notifications.read", "notifications.update", "notifications.delete" },
+            ["Manager"] = new[] { "notifications.read", "notifications.update", "notifications.delete" },
+            ["Agent"] = new[] { "notifications.read", "notifications.update", "notifications.delete" },
+            ["Viewer"] = new[] { "notifications.read" }
+        };
+
+        foreach (var (roleName, permissionNames) in rolePermissions)
+        {
+            var role = await context.Roles.FirstOrDefaultAsync(r => r.Name == roleName);
+            if (role == null) continue;
+
+            var permissions = allNotificationPermissions
+                .Where(p => permissionNames.Contains(p.Name))
+                .ToList();
+
+            foreach (var permission in permissions)
+            {
+                var exists = await context.RolePermissions
+                    .AnyAsync(rp => rp.RoleId == role.Id && rp.PermissionId == permission.Id);
+
+                if (!exists)
+                    context.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = permission.Id });
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using RealSync.Api.Filters;
 using RealSync.Core.Interfaces;
 using RealSync.Shared.DTOs.Requests.Leads;
+using RealSync.Shared.DTOs.Responses.Customers;
 using RealSync.Shared.DTOs.Responses.Leads;
 
 namespace RealSync.Api.Controllers;
@@ -60,5 +61,59 @@ public class LeadsController : BaseController
     {
         await _leadService.DeleteLeadAsync(id);
         return NoContent();
+    }
+
+    [HttpPatch("{id:guid}/status")]
+    [RequirePermission("leads.update")]
+    [ProducesResponseType(typeof(Shared.DTOs.Responses.ApiResponse<LeadResponseDto>), 200)]
+    public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] LeadStatusUpdateDto request)
+    {
+        var result = await _leadService.UpdateStatusAsync(id, request);
+        return OkResponse(result, "Cập nhật trạng thái lead thành công");
+    }
+
+    [HttpPatch("{id:guid}/assign")]
+    [RequirePermission("leads.assign")]
+    [ProducesResponseType(typeof(Shared.DTOs.Responses.ApiResponse<LeadResponseDto>), 200)]
+    public async Task<IActionResult> AssignLead(Guid id, [FromBody] LeadAssignDto request)
+    {
+        var result = await _leadService.AssignLeadAsync(id, request);
+        return OkResponse(result, "Giao lead thành công");
+    }
+
+    [HttpPost("{id:guid}/activities")]
+    [RequirePermission("leads.update")]
+    [ProducesResponseType(typeof(Shared.DTOs.Responses.ApiResponse<LeadActivityDto>), 201)]
+    public async Task<IActionResult> AddActivity(Guid id, [FromBody] LeadActivityCreateDto request)
+    {
+        var result = await _leadService.AddActivityAsync(id, request);
+        return CreatedResponse(result, "Thêm hoạt động lead thành công");
+    }
+
+    [HttpGet("{id:guid}/activities")]
+    [RequirePermission("leads.read")]
+    [ProducesResponseType(typeof(Shared.DTOs.Responses.ApiResponse<IReadOnlyList<LeadActivityDto>>), 200)]
+    public async Task<IActionResult> GetActivities(Guid id)
+    {
+        var result = await _leadService.GetActivitiesAsync(id);
+        return OkResponse(result);
+    }
+
+    [HttpPatch("{id:guid}/follow-up")]
+    [RequirePermission("leads.update")]
+    [ProducesResponseType(typeof(Shared.DTOs.Responses.ApiResponse<LeadResponseDto>), 200)]
+    public async Task<IActionResult> SetFollowUp(Guid id, [FromBody] LeadFollowUpDto request)
+    {
+        var result = await _leadService.SetFollowUpAsync(id, request);
+        return OkResponse(result, "Cập nhật lịch chăm sóc lead thành công");
+    }
+
+    [HttpPost("{id:guid}/convert-to-customer")]
+    [RequirePermission("customers.create")]
+    [ProducesResponseType(typeof(Shared.DTOs.Responses.ApiResponse<CustomerResponseDto>), 201)]
+    public async Task<IActionResult> ConvertToCustomer(Guid id, [FromBody] LeadConvertToCustomerDto request)
+    {
+        var result = await _leadService.ConvertToCustomerAsync(id, request);
+        return CreatedResponse(result, "Chuyển lead thành khách hàng thành công");
     }
 }

@@ -15,4 +15,7 @@ public class LeadQueryDto : PaginationRequest
     public decimal? MaxBudget { get; set; }
     public DateTime? FromDate { get; set; }
     public DateTime? ToDate { get; set; }
+    public bool? OverdueFollowUp { get; set; }
+    public DateTime? FollowUpFrom { get; set; }
+    public DateTime? FollowUpTo { get; set; }
 }
