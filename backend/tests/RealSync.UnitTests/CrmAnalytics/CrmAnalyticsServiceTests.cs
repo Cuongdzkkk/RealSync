@@ -157,9 +157,10 @@ public class CrmAnalyticsServiceTests
     {
         await using var context = CrmAnalyticsTestFactory.CreateContext();
         var now = DateTime.UtcNow;
+        var dueLaterToday = now.Date.AddDays(1).AddTicks(-1);
         context.Leads.AddRange(
             CrmAnalyticsTestFactory.Lead("Overdue", followUpAt: now.AddDays(-1)),
-            CrmAnalyticsTestFactory.Lead("Due Today", followUpAt: now.Date.AddHours(12)),
+            CrmAnalyticsTestFactory.Lead("Due Today", followUpAt: dueLaterToday),
             CrmAnalyticsTestFactory.Lead("Upcoming", followUpAt: now.AddDays(3)),
             CrmAnalyticsTestFactory.Lead("No Follow Up"),
             CrmAnalyticsTestFactory.Lead("Won Ignored", "Won", followUpAt: now.AddDays(-1)),
