@@ -84,6 +84,26 @@
 - No backend API request should be made from Lead List or Lead Detail.
 - Customer, Notification, Analytics and API integration remain separate phases.
 
+## Customer Source Mapping
+
+- `Website`, `Facebook`, `Zalo`, `Phone`, `Referral`, `Other` use compact info badges.
+- Converted customers use a success badge labeled `Chuyển đổi từ Lead`.
+- Direct customers use muted/info treatment labeled `Khách hàng trực tiếp`.
+
+## Customer Table Pattern
+
+- First column combines initials, full name and phone/email.
+- Company falls back to `Cá nhân`.
+- Converted source should show the Lead name as a navigation action.
+- Viewer role is read-only and must not see create, edit, assign or delete actions.
+
+## Customer Activity History Pattern
+
+- Customer activity is read-only.
+- `Create` uses success, `Update` and `View` use info, `Assignment` uses AI/cyan, `Delete` uses danger, `Export` uses warning.
+- Old/New values are parsed defensively; invalid JSON is rendered as plain text.
+- There is no manual Customer activity creation in the UI because the backend contract only exposes read history.
+
 ## Responsive Rules
 
 - Desktop: data-dense table and detail two-column layout.
