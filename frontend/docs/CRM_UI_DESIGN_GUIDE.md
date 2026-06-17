@@ -104,6 +104,17 @@
 - Old/New values are parsed defensively; invalid JSON is rendered as plain text.
 - There is no manual Customer activity creation in the UI because the backend contract only exposes read history.
 
+## Notification Center Pattern
+
+- Notification UI is mock-first and uses `realsync.crm.mock.notifications`.
+- Notification bell reads unread count from Pinia; zero count hides the badge and counts above 99 render as `99+`.
+- Dropdown shows 5-8 newest items with all/unread tabs, no polling, no SignalR and no backend calls.
+- Notification links are resolved through a safe internal-path helper. External URLs, `javascript:`, `data:` and unknown paths fall back to `/admin/notifications`.
+- Notification data JSON is parsed defensively; invalid JSON is shown as plain text in the detail drawer.
+- Type mapping: `System` muted, `Lead` AI/cyan, `Property` success, `Task` warning, `Assignment` info.
+- Viewer role can read notifications but cannot mark read, mark all read or delete.
+- Follow-up notifications show warning for upcoming and danger for overdue based on `scheduledFor`.
+
 ## Responsive Rules
 
 - Desktop: data-dense table and detail two-column layout.
