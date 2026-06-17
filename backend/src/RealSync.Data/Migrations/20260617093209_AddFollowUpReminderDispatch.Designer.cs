@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using RealSync.Data.Context;
 
@@ -11,9 +12,11 @@ using RealSync.Data.Context;
 namespace RealSync.Data.Migrations
 {
     [DbContext(typeof(RealSyncDbContext))]
-    partial class RealSyncDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260617093209_AddFollowUpReminderDispatch")]
+    partial class AddFollowUpReminderDispatch
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

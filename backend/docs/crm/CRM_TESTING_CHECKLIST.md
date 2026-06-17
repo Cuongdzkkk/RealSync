@@ -14,6 +14,9 @@
 - [ ] Add lead activity returns `201`
 - [ ] Get lead activities returns `200`
 - [ ] Set follow-up returns `200`
+- [ ] Automatic follow-up reminder creates exactly one due notification
+- [ ] Automatic follow-up reminder does not duplicate after additional polling cycles
+- [ ] Rescheduled follow-up creates one reminder for the new timestamp
 - [ ] Overdue follow-up filter returns `200`
 - [ ] Convert lead to customer returns `201`
 - [ ] Duplicate conversion returns validation error
@@ -66,6 +69,7 @@
 - [ ] Existing Customer tests pass
 - [ ] Existing Notification tests pass
 - [ ] Existing CRM Analytics tests pass
+- [ ] Follow-up reminder service/background tests pass
 - [ ] Final CRM workflow test passes
 - [ ] Release CI-style test passes
 

@@ -56,6 +56,7 @@ public class RealSyncDbContext : DbContext
 
     // System
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<FollowUpReminderDispatch> FollowUpReminderDispatches => Set<FollowUpReminderDispatch>();
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
 
     // Posting
