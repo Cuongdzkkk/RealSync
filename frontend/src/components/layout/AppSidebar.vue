@@ -14,7 +14,7 @@ interface NavItem {
   to: string;
   icon: string; // SVG path
   group: 'crm' | 'properties' | 'ai' | 'crawler' | 'analytics' | 'admin';
-  roles: ('Admin' | 'Manager' | 'Sales' | 'Marketing' | 'Data Analyst' | 'Agent')[];
+  roles: ('Admin' | 'Manager' | 'Sales' | 'Marketing' | 'Data Analyst' | 'Agent' | 'Viewer')[];
   badge?: string;
   isAi?: boolean;
 }
@@ -36,6 +36,13 @@ const navItems: NavItem[] = [
     group: 'crm',
     roles: ['Admin', 'Manager', 'Sales', 'Agent'],
     badge: 'Hot'
+  },
+  {
+    label: 'Khách hàng',
+    to: '/admin/customers',
+    icon: 'M16 11c1.657 0 3-1.567 3-3.5S17.657 4 16 4s-3 1.567-3 3.5S14.343 11 16 11zM8 11c1.657 0 3-1.567 3-3.5S9.657 4 8 4 5 5.567 5 7.5 6.343 11 8 11zM8 13c-2.667 0-5 1.333-5 3v2h10v-2c0-1.667-2.333-3-5-3zM16 13c-.63 0-1.232.074-1.78.21 1.093.72 1.78 1.69 1.78 2.79v2h5v-2c0-1.667-2.333-3-5-3z',
+    group: 'crm',
+    roles: ['Admin', 'Manager', 'Sales', 'Agent', 'Viewer']
   },
   // Properties Group
   {

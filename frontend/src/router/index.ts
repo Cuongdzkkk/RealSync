@@ -104,6 +104,26 @@ const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: 'customers',
+        name: 'customer-list',
+        component: () => import('@/views/customers/CustomerListView.vue'),
+        meta: {
+          title: 'Khách hàng',
+          roles: ['Admin', 'Manager', 'Sales', 'Agent', 'Viewer'],
+          defaultTimelineOpen: false
+        }
+      },
+      {
+        path: 'customers/:id',
+        name: 'customer-detail',
+        component: () => import('@/views/customers/CustomerDetailView.vue'),
+        meta: {
+          title: 'Chi tiết khách hàng',
+          roles: ['Admin', 'Manager', 'Sales', 'Agent', 'Viewer'],
+          defaultTimelineOpen: false
+        }
+      },
+      {
         path: 'crawlers',
         name: 'crawlers',
         component: () => import('@/views/crawlers/CrawlerView.vue'),
