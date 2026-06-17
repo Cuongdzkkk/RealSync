@@ -85,11 +85,22 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'leads',
-        name: 'leads',
+        name: 'lead-list',
         component: () => import('@/views/leads/LeadListView.vue'),
         meta: {
-          title: 'Khách hàng',
-          roles: ['Admin', 'Manager', 'Sales']
+          title: 'Lead tiềm năng',
+          roles: ['Admin', 'Manager', 'Sales', 'Agent'],
+          defaultTimelineOpen: false
+        }
+      },
+      {
+        path: 'leads/:id',
+        name: 'lead-detail',
+        component: () => import('@/views/leads/LeadDetailView.vue'),
+        meta: {
+          title: 'Chi tiết Lead',
+          roles: ['Admin', 'Manager', 'Sales', 'Agent'],
+          defaultTimelineOpen: false
         }
       },
       {
@@ -137,6 +148,7 @@ declare module 'vue-router' {
   interface RouteMeta {
     title?: string;
     roles?: UserProfile['role'][];
+    defaultTimelineOpen?: boolean;
   }
 }
 

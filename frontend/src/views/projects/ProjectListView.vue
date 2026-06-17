@@ -4,6 +4,7 @@ import { useProjectStore, type Project } from '@/stores/useProjectStore';
 import { useLeadStore } from '@/stores/useLeadStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { formatCurrency } from '@/utils/format';
+import { getLeadTemperature } from '@/utils/crm';
 import RoleGate from '@/components/common/RoleGate.vue';
 
 const projectStore = useProjectStore();
@@ -62,9 +63,9 @@ const matchedLeadsForActiveProject = computed(() => {
     // If project is Grand Marina ( Quận 1, budget very high > 10B) or Metropole (Thủ Đức > 8B)
     const isPremiumProject = activeDetailProject.value!.priceRange.includes('180') || activeDetailProject.value!.priceRange.includes('350');
     if (isPremiumProject) {
-      return lead.budget >= 8000000000 || lead.temperature === 'hot';
+      return (lead.budget ?? 0) >= 8000000000 || getLeadTemperature(lead.score) === 'Hot';
     }
-    return lead.budget >= 3000000000;
+    return (lead.budget ?? 0) >= 3000000000;
   }).map(lead => {
     // Add a simulated match score
     const hash = lead.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -357,8 +358,8 @@ function deleteProjectItem(id: string, name: string) {
               >
                 <div class="lead-match-info">
                   <span class="lead-name">{{ lead.fullName }}</span>
-                  <span class="lead-demand-preview">{{ lead.demand }}</span>
-                  <span class="lead-budget-val numeric">{{ formatCurrency(lead.budget) }}</span>
+                  <span class="lead-demand-preview">{{ lead.requirements }}</span>
+                  <span class="lead-budget-val numeric">{{ formatCurrency(lead.budget ?? 0) }}</span>
                 </div>
                 <div class="lead-match-pct">
                   <span class="pct">{{ lead.matchScore }}%</span>

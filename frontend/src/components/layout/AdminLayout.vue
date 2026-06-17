@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { useAppStore } from '@/stores/useAppStore';
 import AppSidebar from './AppSidebar.vue';
 import AppTopbar from './AppTopbar.vue';
@@ -9,8 +10,17 @@ import CommandPalette from '@/components/common/CommandPalette.vue';
 import ToastContainer from '@/components/common/ToastContainer.vue';
 
 const appStore = useAppStore();
+const route = useRoute();
 const commandPaletteOpen = ref(false);
 const timelineOpen = ref(true);
+
+watch(
+  () => route.fullPath,
+  () => {
+    timelineOpen.value = route.meta.defaultTimelineOpen ?? true;
+  },
+  { immediate: true }
+);
 
 function openCommandPalette() {
   commandPaletteOpen.value = true;

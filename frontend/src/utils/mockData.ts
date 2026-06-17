@@ -96,7 +96,7 @@ export const mockLeads: Lead[] = [
     phone: '0923456789',
     demand: 'Đất nền vùng ven, pháp lý rõ',
     budget: 5000000000,
-    stage: 'viewing',
+    stage: 'proposal',
     temperature: 'cold',
     assignedTo: 'Mai',
     lastContactAt: '2026-05-22T14:45:00Z'

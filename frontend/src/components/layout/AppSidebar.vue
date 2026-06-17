@@ -14,7 +14,7 @@ interface NavItem {
   to: string;
   icon: string; // SVG path
   group: 'crm' | 'properties' | 'ai' | 'crawler' | 'analytics' | 'admin';
-  roles: ('Admin' | 'Manager' | 'Sales' | 'Marketing' | 'Data Analyst')[];
+  roles: ('Admin' | 'Manager' | 'Sales' | 'Marketing' | 'Data Analyst' | 'Agent')[];
   badge?: string;
   isAi?: boolean;
 }
@@ -30,11 +30,11 @@ const navItems: NavItem[] = [
   },
   // CRM Group
   {
-    label: 'Khách hàng (Leads)',
+    label: 'Lead tiềm năng',
     to: '/admin/leads',
     icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
     group: 'crm',
-    roles: ['Admin', 'Manager', 'Sales'],
+    roles: ['Admin', 'Manager', 'Sales', 'Agent'],
     badge: 'Hot'
   },
   // Properties Group
@@ -112,7 +112,7 @@ function handleLogout() {
 
 // Filter nav items based on user role
 const filteredNavItems = computed(() => {
-  return navItems.filter(item => item.roles.includes(currentRole.value as any));
+  return navItems.filter(item => item.roles.some((role) => role === currentRole.value));
 });
 
 const isActive = (to: string) => route.path === to || route.path.startsWith(to + '/');

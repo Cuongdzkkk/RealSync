@@ -2,6 +2,6 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localho
 
 export const APP_NAME = 'RealSync';
 
-export const LEAD_STAGES = ['new', 'contacted', 'qualified', 'viewing', 'closed'] as const;
+export const LEAD_STAGES = ['new', 'contacted', 'qualified', 'proposal', 'won', 'lost'] as const;
 
 export const PROPERTY_STATUSES = ['draft', 'verified', 'published', 'expired'] as const;

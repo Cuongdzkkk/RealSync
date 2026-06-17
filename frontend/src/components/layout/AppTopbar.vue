@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 
@@ -11,6 +11,7 @@ const emit = defineEmits<{
 const appStore = useAppStore();
 const authStore = useAuthStore();
 const route = useRoute();
+const router = useRouter();
 
 const pageTitle = computed(() => route.meta.title as string || 'RealSync');
 const notifCount = ref(3);
@@ -34,6 +35,13 @@ function switchRole(role: typeof availableRoles[number]) {
     }
   }
   showRoleDropdown.value = false;
+}
+
+function openCreateLead() {
+  router.push({
+    name: 'lead-list',
+    query: { action: 'create' }
+  });
 }
 </script>
 
@@ -120,7 +128,7 @@ function switchRole(role: typeof availableRoles[number]) {
       </div>
 
       <!-- Quick Action + CTA -->
-      <button class="btn-new glow-yellow">+ Thêm Lead</button>
+      <button class="btn-new glow-yellow" @click="openCreateLead">+ Thêm Lead</button>
     </div>
   </header>
 </template>
