@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
+import NotificationBell from '@/components/crm/notifications/NotificationBell.vue';
 
 const emit = defineEmits<{
   (e: 'openCommandPalette'): void;
@@ -14,7 +15,6 @@ const route = useRoute();
 const router = useRouter();
 
 const pageTitle = computed(() => route.meta.title as string || 'RealSync');
-const notifCount = ref(3);
 const showRoleDropdown = ref(false);
 
 const availableRoles = ['Admin', 'Manager', 'Sales', 'Agent', 'Viewer', 'Marketing', 'Data Analyst'] as const;
@@ -23,19 +23,33 @@ function switchRole(role: typeof availableRoles[number]) {
   if (authStore.user) {
     authStore.user.role = role;
     if (role === 'Admin') {
+      authStore.user.id = 'local-admin';
       authStore.user.fullName = 'RealSync Admin';
+      authStore.user.email = 'admin@realsync.vn';
     } else if (role === 'Manager') {
+      authStore.user.id = 'local-manager';
       authStore.user.fullName = 'Trần Kinh Doanh (Manager)';
+      authStore.user.email = 'manager@realsync.vn';
     } else if (role === 'Sales') {
+      authStore.user.id = 'local-sales';
       authStore.user.fullName = 'Lê Thị Sales (Sales)';
+      authStore.user.email = 'sales.anh@realsync.vn';
     } else if (role === 'Agent') {
+      authStore.user.id = 'local-agent';
       authStore.user.fullName = 'Phạm Ngọc Agent (Agent)';
+      authStore.user.email = 'agent.ngoc@realsync.vn';
     } else if (role === 'Viewer') {
+      authStore.user.id = 'local-viewer';
       authStore.user.fullName = 'Vũ Viewer (Viewer)';
+      authStore.user.email = 'viewer@realsync.vn';
     } else if (role === 'Marketing') {
+      authStore.user.id = 'local-marketing';
       authStore.user.fullName = 'Hoàng Quảng Cáo (Marketing)';
+      authStore.user.email = 'marketing@realsync.vn';
     } else {
+      authStore.user.id = 'local-analyst';
       authStore.user.fullName = 'Phan Phân Tích (Analyst)';
+      authStore.user.email = 'analyst@realsync.vn';
     }
   }
   showRoleDropdown.value = false;
@@ -98,14 +112,7 @@ function openCreateLead() {
         </svg>
       </button>
 
-      <!-- Notifications -->
-      <button class="topbar-icon-btn relative">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-        </svg>
-        <span v-if="notifCount > 0" class="notif-badge">{{ notifCount }}</span>
-      </button>
+      <NotificationBell />
 
       <!-- Divider -->
       <div class="topbar-divider-line" />
@@ -212,6 +219,8 @@ function openCreateLead() {
 .role-badge--admin { background: var(--color-yellow-muted); color: var(--color-yellow-hover); border: 1px solid rgba(250, 204, 21, 0.2); }
 .role-badge--manager { background: var(--color-info-bg); color: var(--color-info); border: 1px solid var(--color-info-border); }
 .role-badge--sales { background: var(--color-success-bg); color: var(--color-success); border: 1px solid var(--color-success-border); }
+.role-badge--agent { background: var(--color-surface-glass); color: var(--color-text-secondary); border: 1px solid var(--color-border); }
+.role-badge--viewer { background: var(--color-surface-glass); color: var(--color-text-muted); border: 1px solid var(--color-border); }
 .role-badge--marketing { background: rgba(168, 85, 247, 0.08); color: rgb(168, 85, 247); border: 1px solid rgba(168, 85, 247, 0.2); }
 .role-badge--data-analyst { background: var(--color-ai-bg); color: var(--color-ai); border: 1px solid var(--color-ai-border); }
 
@@ -256,23 +265,6 @@ function openCreateLead() {
   border-radius: 4px;
   padding: 1px 4px;
   line-height: 1.2;
-}
-
-.notif-badge {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  background-color: var(--color-danger);
-  color: #ffffff;
-  font-size: 9px;
-  font-weight: 700;
-  height: 14px;
-  min-width: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 99px;
-  border: 1px solid var(--color-surface);
 }
 
 /* Role Selector */

@@ -124,6 +124,16 @@ const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: 'notifications',
+        name: 'notification-list',
+        component: () => import('@/views/notifications/NotificationListView.vue'),
+        meta: {
+          title: 'Thông báo',
+          roles: ['Admin', 'Manager', 'Sales', 'Agent', 'Viewer', 'Marketing', 'Data Analyst'],
+          defaultTimelineOpen: false
+        }
+      },
+      {
         path: 'crawlers',
         name: 'crawlers',
         component: () => import('@/views/crawlers/CrawlerView.vue'),
