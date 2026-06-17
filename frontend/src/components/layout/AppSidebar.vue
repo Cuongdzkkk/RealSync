@@ -44,6 +44,13 @@ const navItems: NavItem[] = [
     group: 'crm',
     roles: ['Admin', 'Manager', 'Sales', 'Agent', 'Viewer']
   },
+  {
+    label: 'Thông báo',
+    to: '/admin/notifications',
+    icon: 'M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0',
+    group: 'crm',
+    roles: ['Admin', 'Manager', 'Sales', 'Agent', 'Viewer', 'Marketing', 'Data Analyst']
+  },
   // Properties Group
   {
     label: 'Bất động sản',
