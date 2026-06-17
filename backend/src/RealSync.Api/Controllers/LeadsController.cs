@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using RealSync.Api.Filters;
 using RealSync.Core.Interfaces;
 using RealSync.Shared.DTOs.Requests.Leads;
+using RealSync.Shared.DTOs.Responses.Customers;
 using RealSync.Shared.DTOs.Responses.Leads;
 
 namespace RealSync.Api.Controllers;
@@ -105,5 +106,14 @@ public class LeadsController : BaseController
     {
         var result = await _leadService.SetFollowUpAsync(id, request);
         return OkResponse(result, "Cập nhật lịch chăm sóc lead thành công");
+    }
+
+    [HttpPost("{id:guid}/convert-to-customer")]
+    [RequirePermission("customers.create")]
+    [ProducesResponseType(typeof(Shared.DTOs.Responses.ApiResponse<CustomerResponseDto>), 201)]
+    public async Task<IActionResult> ConvertToCustomer(Guid id, [FromBody] LeadConvertToCustomerDto request)
+    {
+        var result = await _leadService.ConvertToCustomerAsync(id, request);
+        return CreatedResponse(result, "Chuyển lead thành khách hàng thành công");
     }
 }

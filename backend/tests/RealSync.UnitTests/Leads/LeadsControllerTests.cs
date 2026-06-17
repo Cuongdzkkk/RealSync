@@ -4,6 +4,7 @@ using Moq;
 using RealSync.Api.Controllers;
 using RealSync.Core.Interfaces;
 using RealSync.Shared.DTOs.Requests.Leads;
+using RealSync.Shared.DTOs.Responses.Customers;
 using RealSync.Shared.DTOs.Responses;
 using RealSync.Shared.DTOs.Responses.Leads;
 
@@ -153,5 +154,20 @@ public class LeadsControllerTests
         var result = await controller.SetFollowUp(id, new LeadFollowUpDto { NextFollowUpAt = DateTime.UtcNow.AddDays(1) });
 
         result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Test]
+    public async Task ConvertToCustomer_ShouldReturnCreatedResponse()
+    {
+        var id = Guid.NewGuid();
+        var service = new Mock<ILeadService>();
+        service.Setup(s => s.ConvertToCustomerAsync(id, It.IsAny<LeadConvertToCustomerDto>()))
+            .ReturnsAsync(new CustomerResponseDto { Id = Guid.NewGuid(), FullName = "Customer", ConvertedFromLeadId = id });
+        var controller = new LeadsController(service.Object);
+
+        var result = await controller.ConvertToCustomer(id, new LeadConvertToCustomerDto());
+
+        var created = result.Should().BeOfType<ObjectResult>().Subject;
+        created.StatusCode.Should().Be(201);
     }
 }

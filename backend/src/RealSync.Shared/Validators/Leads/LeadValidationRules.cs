@@ -13,7 +13,7 @@ public static class LeadValidationRules
         StringComparer.OrdinalIgnoreCase);
 
     private static readonly ISet<string> AllowedActivityTypes = new HashSet<string>(
-        new[] { "Call", "Email", "Meeting", "Note", "StatusChange", "Assigned", "FollowUp" },
+        new[] { "Call", "Email", "Meeting", "Note", "StatusChange", "Assigned", "FollowUp", "Converted" },
         StringComparer.OrdinalIgnoreCase);
 
     private static readonly ISet<string> ClientActivityTypes = new HashSet<string>(
