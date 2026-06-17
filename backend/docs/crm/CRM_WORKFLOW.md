@@ -46,6 +46,56 @@ Login
 4. If the lead has an assigned user, an internal notification is created.
 5. Overdue follow-up filters ignore `Won` and `Lost` leads.
 
+## Automated Follow-Up Reminder
+
+Follow-up reminders also run automatically through `FollowUpReminderBackgroundService`.
+
+```text
+BackgroundService
+  -> PeriodicTimer
+  -> scoped IFollowUpReminderService
+  -> find due assigned leads
+  -> create Notification + FollowUpReminderDispatch in one transaction
+```
+
+Configuration:
+
+```json
+{
+  "FollowUpReminders": {
+    "Enabled": true,
+    "PollIntervalSeconds": 60,
+    "BatchSize": 100
+  }
+}
+```
+
+Reminder rules:
+
+- `NextFollowUpAt` must be set and less than or equal to current UTC time.
+- Lead must have `AssignedToId`.
+- Lead status must not be `Won` or `Lost`.
+- Soft-deleted leads are ignored by the existing query filter.
+- The notification is sent to the current `AssignedToId`.
+- No public API is required to trigger reminders.
+
+Notification payload:
+
+- Title: `Đến giờ chăm sóc lead`
+- Message: `Đã đến lịch chăm sóc lead {lead.FullName}.`
+- Type: `Lead`
+- Link: `/leads/{lead.Id}`
+- Data includes `eventType = FollowUpDue`, `leadId`, `scheduledFor`, and `assignedToId`.
+
+Deduplication:
+
+- `FollowUpReminderDispatch` records each sent reminder.
+- Unique index: `(LeadId, ScheduledFor)`.
+- The same lead and same follow-up timestamp cannot create duplicate reminders, even after API restart.
+- If the follow-up is rescheduled to a new timestamp, a new reminder may be sent once for that new timestamp.
+
+SignalR, Hangfire, email, SMS, and Zalo reminders are outside this phase.
+
 ## Convert Lead to Customer
 
 1. Conversion is called from `POST /api/v1/leads/{id}/convert-to-customer`.
@@ -90,6 +140,8 @@ Analytics APIs aggregate:
 | Invalid lead status | Validation error |
 | Assign inactive user | Validation error |
 | Follow-up in the past | Validation error |
+| Follow-up reminder already dispatched for same timestamp | Skip; no duplicate notification |
+| Follow-up rescheduled to new timestamp | A new reminder can be sent once |
 | Notification belongs to another user | Not found |
 | Deleted notification detail | Not found |
 | Deleted customer/lead | Hidden by soft-delete query filter |

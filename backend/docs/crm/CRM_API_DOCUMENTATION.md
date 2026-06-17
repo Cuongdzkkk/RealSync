@@ -114,6 +114,47 @@ Convert lead notes:
 - Prevents duplicate conversion with validation error.
 - Adds a LeadActivity with type `Converted`.
 
+## Automated Follow-Up Reminders
+
+Follow-up reminders are processed automatically by a background worker. No public API is required to trigger a reminder.
+
+Configuration:
+
+```json
+{
+  "FollowUpReminders": {
+    "Enabled": true,
+    "PollIntervalSeconds": 60,
+    "BatchSize": 100
+  }
+}
+```
+
+A reminder is sent when:
+
+- `NextFollowUpAt` is due.
+- The lead is assigned to a user.
+- The lead is not `Won` or `Lost`.
+
+The worker creates a `Notification` and a `FollowUpReminderDispatch` in the same transaction. The dispatch table has a unique `(LeadId, ScheduledFor)` index to prevent duplicate notifications across polling cycles and API restarts. If the follow-up is rescheduled to a new timestamp, the new timestamp can produce one new reminder.
+
+Reminder notification:
+
+```json
+{
+  "title": "Đến giờ chăm sóc lead",
+  "message": "Đã đến lịch chăm sóc lead Nguyen Van A.",
+  "type": "Lead",
+  "link": "/leads/{leadId}",
+  "data": {
+    "eventType": "FollowUpDue",
+    "leadId": "{leadId}",
+    "scheduledFor": "2026-06-17T10:00:00Z",
+    "assignedToId": "{userId}"
+  }
+}
+```
+
 ## Customers
 
 | Method | Endpoint | Permission | Notes |

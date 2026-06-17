@@ -43,6 +43,9 @@ try
     // Application services (DI)
     builder.Services.AddApplicationServices();
 
+    builder.Services.Configure<RealSync.Services.Options.FollowUpReminderOptions>(
+        builder.Configuration.GetSection("FollowUpReminders"));
+
     // JWT Authentication
     builder.Services.AddJwtAuthentication(builder.Configuration);
 

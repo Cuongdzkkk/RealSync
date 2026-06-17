@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using RealSync.Api.Filters;
+using RealSync.Api.HostedServices;
 using RealSync.Api.Services;
 using RealSync.Core.Interfaces;
 using RealSync.Data.Repositories;
@@ -40,6 +41,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<ICrmAnalyticsService, CrmAnalyticsService>();
+        services.AddScoped<IFollowUpReminderService, FollowUpReminderService>();
         services.AddScoped<IPropertyService, PropertyService>();
         services.AddScoped<ILeadService, LeadService>();
         services.AddScoped<ICustomerService, CustomerService>();
@@ -55,6 +57,7 @@ public static class ServiceCollectionExtensions
 
         // FluentValidation — auto-scan tất cả validators từ Shared assembly
         services.AddValidatorsFromAssemblyContaining<RealSync.Shared.Validators.Auth.LoginRequestValidator>();
+        services.AddHostedService<FollowUpReminderBackgroundService>();
 
         return services;
     }
