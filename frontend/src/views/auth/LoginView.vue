@@ -15,22 +15,16 @@ const emailError = ref('')
 const passwordError = ref('')
 
 const form = reactive({
-  email: '',
-  password: ''
-})
+  email: 'admin@realsync.vn',
+  password: 'Admin@123'
+});
 
-const validate = () => {
-  let valid = true
-  emailError.value = ''
-  passwordError.value = ''
-
-  if (!form.email) {
-    emailError.value = 'Vui lòng nhập email'
-    valid = false
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-    emailError.value = 'Email không hợp lệ'
-    valid = false
-  }
+const submit = async () => {
+  await authStore.login(form);
+  ElMessage.success('Đăng nhập thành công');
+  await router.push('/admin/dashboard');
+};
+</script>
 
   if (!form.password) {
     passwordError.value = 'Vui lòng nhập mật khẩu'

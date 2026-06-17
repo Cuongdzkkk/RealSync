@@ -1,14 +1,19 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { usePropertyStore } from '@/stores/usePropertyStore';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { useToastStore } from '@/stores/useToastStore';
-import { mockAiContents } from '@/utils/mockData';
+import { usePostStore } from '@/stores/usePostStore';
 import RoleGate from '@/components/common/RoleGate.vue';
 
 const propertyStore = usePropertyStore();
 const projectStore = useProjectStore();
 const toastStore = useToastStore();
+const postStore = usePostStore();
+
+onMounted(() => {
+  postStore.fetchAllHistory();
+});
 
 // --- Input States ---
 const selectedType = ref<'property' | 'project'>('property');
@@ -42,8 +47,8 @@ watch(selectedType, (newType) => {
   }
 });
 
-// Simulated generation copy database
-function triggerGeneration() {
+// Gọi API backend để tạo Post + sinh nội dung AI
+async function triggerGeneration() {
   if (!selectedTargetItem.value) {
     toastStore.warning('Thiếu đối tượng', 'Vui lòng chọn sản phẩm BĐS hoặc dự án để tạo nội dung.');
     return;
@@ -53,64 +58,41 @@ function triggerGeneration() {
   showPreview.value = false;
   displayedText.value = '';
 
-  // Simulate prompt compilation based on selection
-  let text = '';
   const item = selectedTargetItem.value as any;
-  const emojiPrefix = includeEmojis.value ? '✨🔥 ' : '';
-  const phoneSuffix = includeContact.value ? '\n\n📞 Liên hệ ngay phòng kinh doanh RealSync: 090.888.6666 để xem nhà và nhận chiết khấu tốt nhất!' : '';
+  const itemName = item.name || item.title || 'BĐS';
+  const itemId = item.id;
+  const channel = selectedChannel.value;
 
-  if (selectedChannel.value === 'facebook') {
-    text = `${emojiPrefix}SIÊU PHẨM BẤT ĐỘNG SẢN CỰC HOT MỚI CẬP BẾN KHO HÀNG REALSYNC!\n\n` +
-           `📍 Vị trí đắc địa: ${item.address || item.location}\n` +
-           `💎 Cơ hội sở hữu ${item.name || (item as any).title} đẳng cấp bậc nhất.\n` +
-           `💰 Giá bán hấp dẫn: ${typeof item.price === 'number' ? (item.price / 1000000000).toFixed(1) + ' tỷ VNĐ' : (item as any).priceRange}.\n` +
-           `📐 Diện tích lý tưởng, quy hoạch hiện đại, thiết kế tràn ngập ánh sáng tự nhiên.\n\n` +
-           `👉 Thích hợp để đầu tư sinh lời bền vững hoặc định cư lâu dài.${phoneSuffix}\n#RealSync #BatDongSan #DauTu`;
-  } else if (selectedChannel.value === 'listing') {
-    text = `BÁN CĂN HỘ / SẢN PHẨM: ${item.name || (item as any).title} - GIÁ TỐT NHẤT THỊ TRƯỜNG\n\n` +
-           `- Địa chỉ: ${item.address || item.location}\n` +
-           `- Diện tích: ${ (item as any).acreage ? (item as any).acreage + 'm²' : 'Quy mô lớn' }\n` +
-           `- Pháp lý: Sổ hồng riêng chính chủ, công chứng sang tên ngay.\n` +
-           `- Thiết kế hiện đại, đầy đủ công năng, view sông thoáng đãng.\n` +
-           `- Tiện ích xung quanh: Gần TTTM, hồ bơi tràn bờ, trường học quốc tế, bệnh viện, ga Metro.\n\n` +
-           `Giá bán chính chủ niêm yết: ${typeof item.price === 'number' ? (item.price / 1000000000).toFixed(1) + ' tỷ VNĐ' : (item as any).priceRange}.${phoneSuffix}`;
-  } else if (selectedChannel.value === 'zalo') {
-    text = `${emojiPrefix}[CƠ HỘI ĐẦU TƯ] RealSync gửi tới Quý anh/chị thông tin dự án/BĐS hot:\n` +
-           `- Tên: ${item.name || (item as any).title}\n` +
-           `- Vị trí: ${item.address || item.location}\n` +
-           `- Giá bán: ${typeof item.price === 'number' ? (item.price / 1000000000).toFixed(1) + ' tỷ VNĐ' : (item as any).priceRange}\n` +
-           `Nhận báo giá chi tiết và ưu tiên chọn căn đẹp nhất hôm nay!${phoneSuffix}`;
-  } else {
-    text = `ĐÁNH GIÁ CHI TIẾT DỰ ÁN & TIỀN NĂNG TĂNG GIÁ CỦA ${item.name || (item as any).title}\n\n` +
-           `Nằm tại vị trí đắc địa tại trung tâm ${item.address || item.location}, dự án ${item.name || (item as any).title} đang thu hút sự chú ý cực lớn của giới đầu tư bất động sản TP.HCM.\n\n` +
-           `1. Vị trí kết nối vùng hoàn hảo:\n` +
-           `Tọa lạc tại khu vực hạ tầng đồng bộ, cư dân dễ dàng di chuyển tới các quận lân cận chỉ trong vài phút.\n\n` +
-           `2. Thiết kế và quy mô tiện ích:\n` +
-           `Mật độ xây dựng thấp kết hợp chuỗi tiện ích đẳng cấp 5 sao chuẩn quốc tế mang lại không gian sống trong lành, tinh tế.\n\n` +
-           `3. Tiềm năng thanh khoản và giá bán:\n` +
-           `Với mức giá ${(item as any).priceRange || 'hấp dẫn'}, đây được dự báo là gà đẻ trứng vàng cho các nhà đầu tư trung và dài hạn.${phoneSuffix}`;
-  }
+  // Xây dựng prompt dựa trên channel + tone
+  const prompt = `Viết nội dung ${channel === 'facebook' ? 'Facebook Post' : channel === 'zalo' ? 'Zalo Broadcast' : channel === 'seo' ? 'bài viết SEO' : 'tin đăng BĐS'} cho "${itemName}", giọng văn ${selectedTone.value}, ${includeEmojis.value ? 'có emoji' : 'không emoji'}${includeContact.value ? ', kèm thông tin liên hệ' : ''}`;
 
-  generatedText.value = text;
+  try {
+    // Gọi API: tạo Post → sinh AI content
+    const generation = await postStore.generateContent(itemName, prompt, itemId, channel);
 
-  // Simulate generation delay and character typing effect
-  setTimeout(() => {
+    // Hiển thị nội dung AI trả về với hiệu ứng typing
+    generatedText.value = generation.generatedContent;
+
+    setTimeout(() => {
+      isGenerating.value = false;
+      showPreview.value = true;
+
+      let index = 0;
+      const interval = setInterval(() => {
+        if (index < generation.generatedContent.length) {
+          displayedText.value += generation.generatedContent.slice(index, index + 3);
+          index += 3;
+        } else {
+          clearInterval(interval);
+        }
+      }, 8);
+
+      toastStore.success('Tạo thành công', 'Nội dung AI đã được tạo từ hệ thống.');
+    }, 600);
+  } catch (error: any) {
     isGenerating.value = false;
-    showPreview.value = true;
-    
-    // Typing stream effect
-    let index = 0;
-    const interval = setInterval(() => {
-      if (index < text.length) {
-        displayedText.value += text.slice(index, index + 2);
-        index += 2; // Type 2 characters at a time for speed
-      } else {
-        clearInterval(interval);
-      }
-    }, 10);
-
-    toastStore.success('Tạo thành công', 'Nội dung quảng cáo AI đã được thiết lập thành công.');
-  }, 1200);
+    toastStore.error('Lỗi', error?.response?.data?.message || 'Không thể tạo nội dung AI. Vui lòng thử lại.');
+  }
 }
 
 function copyContent() {
@@ -118,7 +100,34 @@ function copyContent() {
   toastStore.success('Đã sao chép', 'Nội dung đã được sao chép vào bộ nhớ tạm.');
 }
 
-const historyList = ref(mockAiContents);
+// History: lấy từ API posts thay vì mock
+const historyList = computed(() =>
+  postStore.posts.map(p => ({
+    id: p.id,
+    title: p.title,
+    channel: extractChannel(p.summary),
+    status: mapPostStatus(p.status),
+    owner: p.authorName,
+    updatedAt: p.updatedAt ?? p.createdAt,
+  }))
+);
+
+function extractChannel(summary?: string): 'seo' | 'facebook' | 'zalo' | 'listing' {
+  if (!summary) return 'listing';
+  if (summary.includes('facebook')) return 'facebook';
+  if (summary.includes('zalo')) return 'zalo';
+  if (summary.includes('seo')) return 'seo';
+  return 'listing';
+}
+
+function mapPostStatus(status: string): 'draft' | 'review' | 'approved' | 'published' {
+  switch (status) {
+    case 'Published': return 'published';
+    case 'Archived': return 'approved';
+    case 'Failed': return 'review';
+    default: return 'draft';
+  }
+}
 </script>
 
 <template>
@@ -885,6 +894,7 @@ const historyList = ref(mockAiContents);
 .channel-tag.facebook { background-color: rgba(59, 130, 246, 0.15); color: #3b82f6; }
 .channel-tag.zalo { background-color: rgba(14, 165, 233, 0.15); color: #0ea5e9; }
 .channel-tag.seo { background-color: rgba(168, 85, 247, 0.15); color: #a855f7; }
+.channel-tag.listing { background-color: rgba(16, 185, 129, 0.15); color: #10b981; }
 
 .status-lbl {
   font-size: 9px;
