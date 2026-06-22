@@ -516,8 +516,6 @@ async function publishHistoryPost(postId: string, channelName: string) {
             </label>
           </div>
 
-          </div>
-
           <button 
             type="submit" 
             class="generate-btn glow-yellow" 
