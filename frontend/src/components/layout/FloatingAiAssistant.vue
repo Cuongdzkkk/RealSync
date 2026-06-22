@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, nextTick } from 'vue';
+import { api } from '@/services/api';
 
 interface Message {
   id: string;
@@ -49,7 +50,7 @@ function handleQuickAction(action: string) {
   sendMessage();
 }
 
-function sendMessage() {
+async function sendMessage() {
   if (!inputMsg.value.trim() || isResponding.value) return;
 
   const userText = inputMsg.value;
@@ -64,44 +65,51 @@ function sendMessage() {
   isResponding.value = true;
   scrollToBottom();
 
-  // Simulate AI response streaming
-  setTimeout(() => {
-    const aiMessageId = (Date.now() + 1).toString();
-    const fullAiResponse = getAIResponse(userText);
-    
-    messages.value.push({
-      id: aiMessageId,
-      sender: 'ai',
-      text: '',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isStreaming: true
-    });
-    
-    scrollToBottom();
+  const aiMessageId = Date.now().toString();
+  messages.value.push({
+    id: aiMessageId,
+    sender: 'ai',
+    text: 'RealSync AI Copilot đang soạn thảo...',
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    isStreaming: true
+  });
+  scrollToBottom();
 
-    let currentText = '';
-    let wordIndex = 0;
-    const words = fullAiResponse.split(' ');
-    
-    const streamInterval = setInterval(() => {
-      if (wordIndex < words.length) {
-        currentText += (wordIndex === 0 ? '' : ' ') + words[wordIndex];
-        const msgIndex = messages.value.findIndex(m => m.id === aiMessageId);
-        if (msgIndex !== -1) {
-          messages.value[msgIndex].text = currentText;
-        }
-        wordIndex++;
-        scrollToBottom();
-      } else {
-        clearInterval(streamInterval);
-        const msgIndex = messages.value.findIndex(m => m.id === aiMessageId);
-        if (msgIndex !== -1) {
-          messages.value[msgIndex].isStreaming = false;
-        }
-        isResponding.value = false;
+  let fullAiResponse = '';
+  try {
+    const response = await api.post('/ai-chat', { message: userText });
+    fullAiResponse = response.data.data;
+  } catch (error) {
+    fullAiResponse = getAIResponse(userText);
+  }
+
+  const msgIndex = messages.value.findIndex(m => m.id === aiMessageId);
+  if (msgIndex !== -1) {
+    messages.value[msgIndex].text = '';
+  }
+
+  let currentText = '';
+  let wordIndex = 0;
+  const words = fullAiResponse.split(' ');
+  
+  const streamInterval = setInterval(() => {
+    if (wordIndex < words.length) {
+      currentText += (wordIndex === 0 ? '' : ' ') + words[wordIndex];
+      const idx = messages.value.findIndex(m => m.id === aiMessageId);
+      if (idx !== -1) {
+        messages.value[idx].text = currentText;
       }
-    }, 80);
-  }, 1000);
+      wordIndex++;
+      scrollToBottom();
+    } else {
+      clearInterval(streamInterval);
+      const idx = messages.value.findIndex(m => m.id === aiMessageId);
+      if (idx !== -1) {
+        messages.value[idx].isStreaming = false;
+      }
+      isResponding.value = false;
+    }
+  }, 40);
 }
 
 function getAIResponse(query: string): string {

@@ -45,5 +45,23 @@ export const postingService = {
   /** Xoá bài đăng (soft delete) */
   async deletePost(id: string): Promise<void> {
     await api.delete(`/posts/${id}`);
+  },
+
+  /** Tạo kênh đăng bài cho post */
+  async createChannel(postId: string, channel: string): Promise<any> {
+    const { data: res } = await api.post(`/posts/${postId}/channels`, { channel });
+    return res.data;
+  },
+
+  /** Lấy danh sách các kênh đăng bài của post */
+  async getChannels(postId: string): Promise<any[]> {
+    const { data: res } = await api.get(`/posts/${postId}/channels`);
+    return res.data;
+  },
+
+  /** Thực thi đăng bài lên kênh */
+  async publishChannel(postId: string, channelId: string): Promise<any> {
+    const { data: res } = await api.post(`/posts/${postId}/channels/${channelId}/publish`);
+    return res.data;
   }
 };

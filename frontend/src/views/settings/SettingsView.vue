@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useToastStore } from '@/stores/useToastStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { mockUsers, mockRoleCapabilities } from '@/utils/mockData';
 import type { WorkspaceUser } from '@/types/user';
+import { api } from '@/services/api';
 
 const toastStore = useToastStore();
 const authStore = useAuthStore();
 
 // --- Active Tab State ---
-const activeTab = ref<'general' | 'ai' | 'crawler' | 'users'>('general');
+const activeTab = ref<'general' | 'ai' | 'crawler' | 'users' | 'channels'>('general');
 
 // --- General Config State ---
 const generalForm = ref({
@@ -110,6 +111,85 @@ function changeUserRole(user: WorkspaceUser, newRole: any) {
   user.role = newRole;
   toastStore.success('Đổi vai trò', `Đã chuyển vai trò của ${user.fullName} thành ${newRole}.`);
 }
+
+const isSavingChannels = ref(false);
+const channelsForm = ref({
+  facebookPageId: '',
+  facebookAccessToken: '',
+  metaAppId: '',
+  metaAppSecret: '',
+  zaloPageId: '',
+  zaloTargetGroupId: '',
+  facebookGroupIds: ''
+});
+
+const fbUserToken = ref('');
+const fbPages = ref<any[]>([]);
+const isFetchingFbPages = ref(false);
+const showFbHelper = ref(false);
+
+async function handleFetchFbPages() {
+  if (!fbUserToken.value.trim()) {
+    toastStore.warning('Thiếu Token', 'Vui lòng nhập User Access Token.');
+    return;
+  }
+  isFetchingFbPages.value = true;
+  try {
+    const { data: res } = await api.post('/settings/facebook/fetch-pages', {
+      userAccessToken: fbUserToken.value,
+      appId: channelsForm.value.metaAppId,
+      appSecret: channelsForm.value.metaAppSecret
+    });
+    if (res.data && res.data.length > 0) {
+      fbPages.value = res.data;
+      toastStore.success('Thành công', `Tìm thấy ${res.data.length} trang Facebook.`);
+    } else {
+      fbPages.value = [];
+      toastStore.info('Không tìm thấy', 'Không tìm thấy trang nào được quản lý bởi token này.');
+    }
+  } catch (error: any) {
+    toastStore.error('Lỗi', error.response?.data?.message || 'Không thể lấy danh sách trang.');
+  } finally {
+    isFetchingFbPages.value = false;
+  }
+}
+
+function selectFbPage(page: any) {
+  channelsForm.value.facebookPageId = page.id;
+  channelsForm.value.facebookAccessToken = page.accessToken;
+  toastStore.success('Đã điền', `Đã tự động điền ID và Access Token cho trang "${page.name}".`);
+}
+
+onMounted(async () => {
+  try {
+    const { data: res } = await api.get('/settings/channels');
+    if (res.data) {
+      channelsForm.value = {
+        facebookPageId: res.data.facebookPageId || '',
+        facebookAccessToken: res.data.facebookAccessToken || '',
+        metaAppId: res.data.metaAppId || '',
+        metaAppSecret: res.data.metaAppSecret || '',
+        zaloPageId: res.data.zaloPageId || '',
+        zaloTargetGroupId: res.data.zaloTargetGroupId || '',
+        facebookGroupIds: res.data.facebookGroupIds || ''
+      };
+    }
+  } catch (error) {
+    // API interceptor will show the error toast
+  }
+});
+
+async function handleSaveChannels() {
+  isSavingChannels.value = true;
+  try {
+    await api.post('/settings/channels', channelsForm.value);
+    toastStore.success('Đã lưu cấu hình', 'Thiết lập cấu hình các kênh đăng bài đã được lưu thành công.');
+  } catch (error) {
+    // API interceptor will show the error toast
+  } finally {
+    isSavingChannels.value = false;
+  }
+}
 </script>
 
 <template>
@@ -148,6 +228,14 @@ function changeUserRole(user: WorkspaceUser, newRole: any) {
         >
           <span class="icon">👥</span>
           <span>Nhân sự & Phân quyền</span>
+        </button>
+        <button 
+          class="tab-link" 
+          :class="{ active: activeTab === 'channels' }"
+          @click="activeTab = 'channels'"
+        >
+          <span class="icon">📢</span>
+          <span>Cấu hình Kênh đăng</span>
         </button>
       </div>
 
@@ -510,6 +598,92 @@ function changeUserRole(user: WorkspaceUser, newRole: any) {
               </table>
             </div>
           </div>
+        </div>
+
+        <!-- 5. SOCIAL CHANNELS SETTINGS PANEL -->
+        <div v-if="activeTab === 'channels'" class="panel-section animate-fade">
+          <div class="panel-header">
+            <h3>Cấu hình Kênh đăng tải Social</h3>
+            <p class="subtitle">Nhập thông tin ID Trang, Nhóm và các Access Token để tự động xuất bản bài viết mà không cần sửa code.</p>
+          </div>
+
+          <form @submit.prevent="handleSaveChannels" class="settings-form">
+            <!-- Facebook Section -->
+            <div class="channel-setting-section">
+              <h4 class="section-title">👥 Facebook Configuration</h4>
+              <div class="form-group">
+                <label>ID Trang Facebook hoặc ID Trang cá nhân (Facebook Page/Profile ID)</label>
+                <input v-model="channelsForm.facebookPageId" type="text" placeholder="Nhập ID Trang hoặc Profile ID (ví dụ: 1234567890)..." />
+              </div>
+              <div class="form-group">
+                <label>Mã truy cập trang (Page Access Token - Để trống để chạy chế độ giả lập đăng bài)</label>
+                <input v-model="channelsForm.facebookAccessToken" type="text" placeholder="Nhập EAAOTc0... (Nếu không nhập, hệ thống sẽ tự động đăng giả lập)" />
+              </div>
+              <div class="form-group">
+                <label>ID nhóm Facebook đăng bài (cách nhau bởi dấu phẩy)</label>
+                <input v-model="channelsForm.facebookGroupIds" type="text" placeholder="Nhập ID các nhóm Facebook (ví dụ: 123456789, 987654321)..." />
+              </div>
+
+              <!-- Fanpage Token Helper Accordion/Block -->
+              <div class="fb-token-helper glass-card">
+                <div class="helper-header" @click="showFbHelper = !showFbHelper">
+                  <span class="helper-title">🔑 Trình hỗ trợ liên kết Fanpage tự động</span>
+                  <span class="helper-toggle-icon">{{ showFbHelper ? '▼' : '▶' }}</span>
+                </div>
+                <div v-show="showFbHelper" class="helper-content animate-fade">
+                  <p class="helper-desc">Dán User Access Token (từ Meta Graph Explorer) để tự động lấy Page ID và Page Access Token vĩnh viễn mà không cần thao tác thủ công.</p>
+                  <div class="form-group">
+                    <label>Mã truy cập người dùng (User Access Token)</label>
+                    <div class="input-with-btn">
+                      <input v-model="fbUserToken" type="text" placeholder="Nhập mã truy cập người dùng EAA..." />
+                      <button type="button" class="btn-submit glow-yellow" :disabled="isFetchingFbPages" @click="handleFetchFbPages">
+                        {{ isFetchingFbPages ? 'Đang tải...' : 'Lấy danh sách Trang' }}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div v-if="fbPages.length > 0" class="fb-pages-list">
+                    <label>Chọn Fanpage của bạn:</label>
+                    <div class="pages-grid">
+                      <div v-for="page in fbPages" :key="page.id" class="fb-page-item" @click="selectFbPage(page)">
+                        <div class="page-info">
+                          <span class="page-name">🚩 {{ page.name }}</span>
+                          <span class="page-id">ID: {{ page.id }}</span>
+                        </div>
+                        <button type="button" class="select-btn">Chọn</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>ID ứng dụng Meta (Meta App ID - Tùy chọn)</label>
+                  <input v-model="channelsForm.metaAppId" type="text" placeholder="Nhập App ID..." />
+                </div>
+                <div class="form-group">
+                  <label>Khóa bảo mật App (Meta App Secret - Tùy chọn)</label>
+                  <input v-model="channelsForm.metaAppSecret" type="text" placeholder="Nhập App Secret..." />
+                </div>
+              </div>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <!-- Zalo Section -->
+            <div class="channel-setting-section">
+              <h4 class="section-title">💬 Zalo Configuration</h4>
+              <div class="form-group">
+                <label>ID Trang Zalo OA hoặc Số điện thoại cá nhân (Zalo Page/Profile ID)</label>
+                <input v-model="channelsForm.zaloPageId" type="text" placeholder="Nhập ID Trang OA hoặc Số điện thoại Zalo cá nhân (ví dụ: 0987654321)..." />
+              </div>
+            </div>
+
+            <button type="submit" class="save-btn glow-yellow" :disabled="isSavingChannels">
+              {{ isSavingChannels ? 'Đang lưu...' : 'Lưu cấu hình kênh' }}
+            </button>
+          </form>
         </div>
       </div>
     </div>
@@ -1077,6 +1251,145 @@ input:checked + .slider:before {
   background-color: var(--color-yellow);
   color: var(--color-yellow-text);
   font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.channel-setting-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section-title {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+/* FB Token Helper Styles */
+.fb-token-helper {
+  margin-top: 4px;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.015);
+  overflow: hidden;
+}
+
+.helper-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+  background: rgba(255, 255, 255, 0.02);
+  transition: background 0.2s;
+}
+
+.helper-header:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.helper-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-yellow);
+}
+
+.helper-toggle-icon {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+}
+
+.helper-content {
+  padding: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.helper-desc {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin: 0 0 12px 0;
+  line-height: 1.4;
+}
+
+.input-with-btn {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.input-with-btn input {
+  flex: 1;
+}
+
+.fb-pages-list {
+  margin-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 12px;
+}
+
+.fb-pages-list > label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+}
+
+.pages-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.fb-page-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.fb-page-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--color-yellow);
+}
+
+.fb-page-item .page-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fb-page-item .page-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.fb-page-item .page-id {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+}
+
+.fb-page-item .select-btn {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: none;
+  background-color: var(--color-yellow);
+  color: var(--color-yellow-text);
+  font-size: 10px;
   font-weight: 600;
   cursor: pointer;
 }

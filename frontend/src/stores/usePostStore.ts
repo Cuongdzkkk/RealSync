@@ -69,9 +69,16 @@ export const usePostStore = defineStore('post', () => {
         propertyId: validPropertyId,
       });
 
-      // 3. Cập nhật state
-      currentPost.value = post;
-      posts.value.unshift(post);
+      // 3. Cập nhật nội dung bài đăng vào trường Content của Post
+      const updatedPost = await postingService.updatePost(post.id, {
+        title: post.title,
+        content: result.generatedContent,
+        propertyId: validPropertyId,
+      });
+
+      // 4. Cập nhật state
+      currentPost.value = updatedPost;
+      posts.value.unshift(updatedPost);
 
       return result;
     } finally {

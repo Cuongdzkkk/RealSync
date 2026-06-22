@@ -84,9 +84,9 @@ public class AIContentService : IAIContentService
     //  Gemini API
     // ============================================================
 
-    private async Task<string> CallGeminiAsync(string prompt, Post post)
+    private async Task<string> CallGeminiAsync(string prompt, Post? post = null)
     {
-        var propertyInfo = post.Property != null
+        var propertyInfo = (post != null && post.Property != null)
             ? $"\n\nThông tin BĐS: {post.Property.Title} - {post.Property.Description ?? ""}"
             : "";
 
@@ -134,15 +134,15 @@ public class AIContentService : IAIContentService
     /// <summary>Kiểm tra opencode có sẵn trên máy không</summary>
     private static async Task<bool> IsOpencodeAvailableAsync()
     {
-        if (_isOpencodeAvailable.HasValue)
-            return _isOpencodeAvailable.Value;
+        if (_isOpencodeAvailable.HasValue && _isOpencodeAvailable.Value)
+            return true;
 
         return await Task.Run(() =>
         {
             lock (_lock)
             {
-                if (_isOpencodeAvailable.HasValue)
-                    return _isOpencodeAvailable.Value;
+                if (_isOpencodeAvailable.HasValue && _isOpencodeAvailable.Value)
+                    return true;
 
                 try
                 {
@@ -173,9 +173,9 @@ public class AIContentService : IAIContentService
     }
 
     /// <summary>Gọi opencode CLI để sinh nội dung (free, local)</summary>
-    private static async Task<string> CallOpencodeAsync(string prompt, Post post)
+    private static async Task<string> CallOpencodeAsync(string prompt, Post? post = null)
     {
-        var propertyInfo = post.Property != null
+        var propertyInfo = (post != null && post.Property != null)
             ? $"\n\nThông tin BĐS: {post.Property.Title}"
             : "";
 
@@ -352,5 +352,48 @@ public class AIContentService : IAIContentService
             GeneratedContent = generation.GeneratedContent,
             CreatedAt = generation.CreatedAt,
         };
+    }
+
+    public async Task<string> ChatAsync(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            throw new BusinessException("Tin nhắn không được để trống.");
+
+        var systemInstructions = "Bạn là RealSync AI Copilot, trợ lý AI thông minh chuyên nghiệp tích hợp trong hệ thống CRM Bất động sản RealSync. "
+            + "Nhiệm vụ của bạn là hỗ trợ người dùng (nhân viên môi giới, chủ tịch, quản lý BĐS) về chấm điểm lead, soạn tin đăng BĐS, phân tích thị trường hoặc gợi ý chăm sóc khách hàng. "
+            + "Hãy trả lời bằng tiếng Việt, súc tích, chuyên nghiệp và hữu ích. Trả lời trực tiếp câu hỏi của người dùng.";
+
+        var fullPrompt = $"{systemInstructions}\n\nNgười dùng hỏi: {message}\n\nTrả lời:";
+
+        if (_aiOptions.IsConfigured)
+        {
+            return await CallGeminiAsync(fullPrompt, null);
+        }
+        else if (await IsOpencodeAvailableAsync())
+        {
+            return await CallOpencodeAsync(fullPrompt, null);
+        }
+        else
+        {
+            return GetMockChatResponse(message);
+        }
+    }
+
+    private static string GetMockChatResponse(string message)
+    {
+        var lowercase = message.ToLower();
+        if (lowercase.Contains("chấm điểm") || lowercase.Contains("score") || lowercase.Contains("lead"))
+        {
+            return "Hệ thống AI vừa chấm điểm khách hàng **Nguyễn Văn A** đạt **92/100 điểm**. Điểm số dựa trên hành vi điền form nhanh, tương tác 3 lần trên Zalo và tìm kiếm phân khúc **Căn hộ Quận 2**. Khuyến nghị: Liên hệ ngay trong hôm nay.";
+        }
+        if (lowercase.Contains("soạn") || lowercase.Contains("tin đăng") || lowercase.Contains("content"))
+        {
+            return "Dưới đây là tin đăng mẫu do tôi soạn thảo:\n\n**[CĂN HỘ CAO CẤP QUẬN 2 - GIÁ CHỈ 4.5 TỶ]**\n- Vị trí vàng trung tâm Thạnh Mỹ Lợi.\n- Diện tích 75m², 2 phòng ngủ rộng rãi, ban công view sông Sài Gòn thoáng mát.\n- Nội thất bàn giao cao cấp, liền kề tuyến Metro.\n📞 Liên hệ ngay hôm nay để nhận thông tin chiết khấu!";
+        }
+        if (lowercase.Contains("gợi ý") || lowercase.Contains("chăm sóc"))
+        {
+            return "Gợi ý hành động tiếp theo cho khách hàng **Trần Thị B**:\n1. Gửi tài liệu phân tích mặt bằng căn hộ qua Zalo.\n2. Lên lịch hẹn xem nhà vào lúc 9:00 sáng Thứ Bảy tuần này.\n3. Cập nhật ghi chú trên CRM.";
+        }
+        return "Tôi đã ghi nhận yêu cầu của bạn. Tuy nhiên hiện tại kết nối AI cục bộ (opencode) hoặc Gemini API chưa được mở trên máy chủ. Đây là câu trả lời giả lập từ hệ thống RealSync.";
     }
 }

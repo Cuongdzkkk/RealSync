@@ -5,24 +5,37 @@ import { useProjectStore } from '@/stores/useProjectStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { usePostStore } from '@/stores/usePostStore';
 import RoleGate from '@/components/common/RoleGate.vue';
+import { postingService } from '@/services/postingService';
+import { api } from '@/services/api';
 
 const propertyStore = usePropertyStore();
 const projectStore = useProjectStore();
 const toastStore = useToastStore();
 const postStore = usePostStore();
 
-onMounted(() => {
+onMounted(async () => {
   postStore.fetchAllHistory();
+  try {
+    const { data: res } = await api.get('/settings/channels');
+    if (res.data && res.data.facebookGroupIds) {
+      fbGroupIds.value = res.data.facebookGroupIds;
+    }
+  } catch (err) {
+    console.warn('Cannot fetch system channels config', err);
+  }
 });
 
 // --- Input States ---
 const selectedType = ref<'property' | 'project'>('property');
 const selectedPropertyId = ref(propertyStore.items[0]?.id || '');
 const selectedProjectId = ref(projectStore.items[0]?.id || '');
-const selectedChannel = ref<'facebook' | 'listing' | 'zalo' | 'seo'>('facebook');
+const selectedChannel = ref<'facebook' | 'listing' | 'zalo' | 'seo' | 'batdongsan' | 'chotot' | 'alonhadat'>('facebook');
 const selectedTone = ref<string>('persuasive');
 const includeEmojis = ref(true);
 const includeContact = ref(true);
+const fbGroupIds = ref('');
+const showGroupModal = ref(false);
+const activeGroups = ref<string[]>([]);
 
 // --- Generator States ---
 const isGenerating = ref(false);
@@ -36,6 +49,27 @@ const selectedTargetItem = computed(() => {
   } else {
     return projectStore.items.find(p => p.id === selectedProjectId.value);
   }
+});
+
+const displayTitle = computed(() => {
+  const item = selectedTargetItem.value;
+  if (!item) return '';
+  return 'title' in item ? item.title : item.name;
+});
+
+const displayPrice = computed(() => {
+  const item = selectedTargetItem.value;
+  if (!item) return '';
+  if ('price' in item) {
+    return item.price ? (item.price / 1000000000).toFixed(1) + ' tỷ' : 'Thỏa thuận';
+  }
+  return 'priceRange' in item ? item.priceRange : 'Thỏa thuận';
+});
+
+const displayLocation = computed(() => {
+  const item = selectedTargetItem.value;
+  if (!item) return '';
+  return 'location' in item ? item.location : (item.address || item.area || '');
 });
 
 // Watch to sync initial defaults
@@ -112,11 +146,15 @@ const historyList = computed(() =>
   }))
 );
 
-function extractChannel(summary?: string): 'seo' | 'facebook' | 'zalo' | 'listing' {
+function extractChannel(summary?: string): 'seo' | 'facebook' | 'zalo' | 'listing' | 'batdongsan' | 'chotot' | 'alonhadat' {
   if (!summary) return 'listing';
-  if (summary.includes('facebook')) return 'facebook';
-  if (summary.includes('zalo')) return 'zalo';
-  if (summary.includes('seo')) return 'seo';
+  const sum = summary.toLowerCase();
+  if (sum.includes('facebook')) return 'facebook';
+  if (sum.includes('zalo')) return 'zalo';
+  if (sum.includes('seo')) return 'seo';
+  if (sum.includes('batdongsan')) return 'batdongsan';
+  if (sum.includes('chotot')) return 'chotot';
+  if (sum.includes('alonhadat')) return 'alonhadat';
   return 'listing';
 }
 
@@ -126,6 +164,205 @@ function mapPostStatus(status: string): 'draft' | 'review' | 'approved' | 'publi
     case 'Archived': return 'approved';
     case 'Failed': return 'review';
     default: return 'draft';
+  }
+}
+
+const isPublishing = ref(false);
+
+function fallbackCopyTextToClipboard(text: string) {
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.top = "0";
+  textArea.style.left = "0";
+  textArea.style.position = "fixed";
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  try {
+    document.execCommand('copy');
+  } catch (err) {
+    console.error('Fallback copy failed', err);
+  }
+  document.body.removeChild(textArea);
+}
+
+async function copyTextToClipboard(text: string) {
+  if (!navigator.clipboard) {
+    fallbackCopyTextToClipboard(text);
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (err) {
+    fallbackCopyTextToClipboard(text);
+  }
+}
+
+async function copyHistoryContent(postId: string) {
+  const post = postStore.posts.find(p => p.id === postId);
+  const content = post?.content || '';
+  await copyTextToClipboard(content);
+  toastStore.success('Đã sao chép', 'Đã copy nội dung lịch sử vào bộ nhớ tạm.');
+}
+
+async function deleteHistoryPost(postId: string) {
+  try {
+    await postingService.deletePost(postId);
+    toastStore.success('Đã ẩn bài đăng', 'Bài đăng đã được ẩn khỏi danh sách.');
+    postStore.fetchAllHistory();
+  } catch (error: any) {
+    toastStore.error('Lỗi', error.response?.data?.message || 'Không thể ẩn bài đăng.');
+  }
+}
+
+async function publishCurrentPost() {
+  if (!postStore.currentPost) {
+    toastStore.warning('Lỗi', 'Không tìm thấy thông tin bài đăng để publish.');
+    return;
+  }
+  
+  isPublishing.value = true;
+  const channelName = selectedChannel.value;
+  const postId = postStore.currentPost.id;
+
+  // Tự động copy nội dung cho Facebook và Zalo trước khi chạy API
+  if (channelName.toLowerCase() === 'facebook' || channelName.toLowerCase() === 'zalo') {
+    await copyTextToClipboard(displayedText.value);
+  }
+
+  try {
+    // Check if channel already exists for this post
+    const existingChannels = await postingService.getChannels(postId);
+    const existing = existingChannels.find(c => c.channel?.toLowerCase() === channelName.toLowerCase());
+    
+    let channelId = '';
+    if (existing) {
+      channelId = existing.id;
+    } else {
+      const channelObj = await postingService.createChannel(postId, channelName);
+      channelId = channelObj.id;
+    }
+    
+    await postingService.publishChannel(postId, channelId);
+    
+    // Tự động mở tab đăng bài nếu là Facebook hoặc Zalo
+    if (channelName.toLowerCase() === 'facebook') {
+      const groups = fbGroupIds.value.split(',').map((id: string) => id.trim()).filter((id: string) => id.length > 0);
+      if (groups.length > 1) {
+        activeGroups.value = groups;
+        showGroupModal.value = true;
+        toastStore.success('Đã copy nội dung', 'Nội dung đã được copy. Vui lòng chọn nhóm trên hộp thoại để đăng.');
+      } else if (groups.length === 1) {
+        window.open(`https://www.facebook.com/groups/${groups[0]}`, '_blank');
+        toastStore.success('Đăng bài & Mở nhóm', 'Nội dung đã được copy. Đang mở nhóm Facebook trong tab mới.');
+      } else {
+        window.open('https://www.facebook.com', '_blank');
+        toastStore.success('Đăng bài & Mở Facebook', 'Nội dung đã được copy. Đang mở Facebook trong tab mới.');
+      }
+    } else if (channelName.toLowerCase() === 'zalo') {
+      window.open('https://chat.zalo.me/', '_blank');
+      toastStore.success('Đăng bài & Mở Zalo', 'Nội dung đã được copy. Đang mở Zalo Web trong tab mới.');
+    } else {
+      toastStore.success('Đăng bài thành công', `Bài đăng đã được xuất bản lên kênh ${channelName.toUpperCase()}.`);
+    }
+
+    postStore.fetchAllHistory();
+  } catch (error: any) {
+    // Fallback manual redirection when API fails
+    if (channelName.toLowerCase() === 'facebook' || channelName.toLowerCase() === 'zalo') {
+      if (channelName.toLowerCase() === 'facebook') {
+        const groups = fbGroupIds.value.split(',').map((id: string) => id.trim()).filter((id: string) => id.length > 0);
+        if (groups.length > 1) {
+          activeGroups.value = groups;
+          showGroupModal.value = true;
+          toastStore.warning('Hệ thống API lỗi - Đã mở danh sách Nhóm', 'Đã chuyển sang chế độ thủ công. Chọn nhóm trên hộp thoại để đăng.');
+        } else if (groups.length === 1) {
+          window.open(`https://www.facebook.com/groups/${groups[0]}`, '_blank');
+          toastStore.warning('Hệ thống API lỗi - Đã mở Nhóm', 'Đã chuyển sang chế độ thủ công. Đang mở nhóm Facebook.');
+        } else {
+          window.open('https://www.facebook.com', '_blank');
+          toastStore.warning('Hệ thống API lỗi - Đã mở Facebook', 'Đã chuyển sang chế độ thủ công. Đang mở Facebook.');
+        }
+      } else if (channelName.toLowerCase() === 'zalo') {
+        window.open('https://chat.zalo.me/', '_blank');
+        toastStore.warning('Hệ thống API lỗi - Đã mở Zalo', 'Đã chuyển sang chế độ thủ công. Đang mở Zalo Web.');
+      }
+    } else {
+      toastStore.error('Lỗi đăng bài', error?.response?.data?.message || 'Không thể đăng bài lên kênh. Vui lòng thử lại.');
+    }
+  } finally {
+    isPublishing.value = false;
+  }
+}
+
+async function publishHistoryPost(postId: string, channelName: string) {
+  const post = postStore.posts.find(p => p.id === postId);
+  const content = post?.content || '';
+
+  // Tự động copy nội dung cho Facebook và Zalo trước khi chạy API
+  if (channelName.toLowerCase() === 'facebook' || channelName.toLowerCase() === 'zalo') {
+    await copyTextToClipboard(content);
+  }
+
+  try {
+    // Check if channel already exists for this post
+    const existingChannels = await postingService.getChannels(postId);
+    const existing = existingChannels.find(c => c.channel?.toLowerCase() === channelName.toLowerCase());
+    
+    let channelId = '';
+    if (existing) {
+      channelId = existing.id;
+    } else {
+      const channelObj = await postingService.createChannel(postId, channelName);
+      channelId = channelObj.id;
+    }
+    
+    await postingService.publishChannel(postId, channelId);
+    
+    if (channelName.toLowerCase() === 'facebook') {
+      const groups = fbGroupIds.value.split(',').map((id: string) => id.trim()).filter((id: string) => id.length > 0);
+      if (groups.length > 1) {
+        activeGroups.value = groups;
+        showGroupModal.value = true;
+        toastStore.success('Đã copy nội dung', 'Nội dung đã được copy. Vui lòng chọn nhóm trên hộp thoại để đăng.');
+      } else if (groups.length === 1) {
+        window.open(`https://www.facebook.com/groups/${groups[0]}`, '_blank');
+        toastStore.success('Đăng bài & Mở nhóm', 'Nội dung đã được copy. Đang mở nhóm Facebook trong tab mới.');
+      } else {
+        window.open('https://www.facebook.com', '_blank');
+        toastStore.success('Đăng bài & Mở Facebook', 'Nội dung đã được copy. Đang mở Facebook trong tab mới.');
+      }
+    } else if (channelName.toLowerCase() === 'zalo') {
+      window.open('https://chat.zalo.me/', '_blank');
+      toastStore.success('Đăng bài & Mở Zalo', 'Nội dung đã được copy. Đang mở Zalo Web trong tab mới.');
+    } else {
+      toastStore.success('Đăng bài thành công', `Bài đăng đã được xuất bản lên kênh ${channelName.toUpperCase()}.`);
+    }
+
+    postStore.fetchAllHistory();
+  } catch (error: any) {
+    // Fallback manual redirection when API fails
+    if (channelName.toLowerCase() === 'facebook' || channelName.toLowerCase() === 'zalo') {
+      if (channelName.toLowerCase() === 'facebook') {
+        const groups = fbGroupIds.value.split(',').map((id: string) => id.trim()).filter((id: string) => id.length > 0);
+        if (groups.length > 1) {
+          activeGroups.value = groups;
+          showGroupModal.value = true;
+          toastStore.warning('Hệ thống API lỗi - Đã mở danh sách Nhóm', 'Đã chuyển sang chế độ thủ công. Chọn nhóm trên hộp thoại để đăng.');
+        } else if (groups.length === 1) {
+          window.open(`https://www.facebook.com/groups/${groups[0]}`, '_blank');
+          toastStore.warning('Hệ thống API lỗi - Đã mở Nhóm', 'Đã chuyển sang chế độ thủ công. Đang mở nhóm Facebook.');
+        } else {
+          window.open('https://www.facebook.com', '_blank');
+          toastStore.warning('Hệ thống API lỗi - Đã mở Facebook', 'Đã chuyển sang chế độ thủ công. Đang mở Facebook.');
+        }
+      } else if (channelName.toLowerCase() === 'zalo') {
+        window.open('https://chat.zalo.me/', '_blank');
+        toastStore.warning('Hệ thống API lỗi - Đã mở Zalo', 'Đã tự động chuyển sang chế độ thủ công. Nội dung đã được copy. Đang mở Zalo Web.');
+      }
+    } else {
+      toastStore.error('Lỗi đăng bài', error?.response?.data?.message || 'Không thể đăng bài lên kênh. Vui lòng thử lại.');
+    }
   }
 }
 </script>
@@ -228,6 +465,30 @@ function mapPostStatus(status: string): 'draft' | 'review' | 'approved' | 'publi
                 <span class="icon">🔍</span>
                 <span>Bài viết SEO</span>
               </div>
+              <div 
+                class="channel-card" 
+                :class="{ active: selectedChannel === 'batdongsan' }"
+                @click="selectedChannel = 'batdongsan'"
+              >
+                <span class="icon">🏠</span>
+                <span>Batdongsan.com.vn</span>
+              </div>
+              <div 
+                class="channel-card" 
+                :class="{ active: selectedChannel === 'chotot' }"
+                @click="selectedChannel = 'chotot'"
+              >
+                <span class="icon">🏷️</span>
+                <span>Chợ Tốt Đất</span>
+              </div>
+              <div 
+                class="channel-card" 
+                :class="{ active: selectedChannel === 'alonhadat' }"
+                @click="selectedChannel = 'alonhadat'"
+              >
+                <span class="icon">🏘️</span>
+                <span>Alo Nhà Đất</span>
+              </div>
             </div>
           </div>
 
@@ -253,6 +514,8 @@ function mapPostStatus(status: string): 'draft' | 'review' | 'approved' | 'publi
               <input type="checkbox" v-model="includeContact" />
               <span>Kèm thông tin liên hệ</span>
             </label>
+          </div>
+
           </div>
 
           <button 
@@ -301,7 +564,13 @@ function mapPostStatus(status: string): 'draft' | 'review' | 'approved' | 'publi
         <div v-if="showPreview && !isGenerating" class="preview-workspace animate-fade">
           <div class="mockup-header-actions">
             <span class="mockup-tag">{{ selectedChannel.toUpperCase() }} MOCKUP</span>
-            <button class="copy-btn glow-yellow" @click="copyContent">Sao chép nội dung</button>
+            <div style="display: flex; gap: 8px;">
+              <button class="copy-btn glow-yellow" @click="copyContent">Sao chép nội dung</button>
+              <button class="publish-btn" :disabled="isPublishing" @click="publishCurrentPost">
+                <span v-if="isPublishing" class="spinner-inline"></span>
+                {{ isPublishing ? 'Đang đăng...' : 'Đăng bài (Publish)' }}
+              </button>
+            </div>
           </div>
 
           <!-- Facebook Mockup -->
@@ -333,6 +602,69 @@ function mapPostStatus(status: string): 'draft' | 'review' | 'approved' | 'publi
               <div class="zalo-bubble">
                 <textarea v-model="displayedText" rows="10" class="editor-textarea"></textarea>
                 <div class="zalo-meta">15:52 · Đã gửi</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Batdongsan Mockup -->
+          <div v-else-if="selectedChannel === 'batdongsan'" class="batdongsan-mockup glass-card">
+            <div class="bds-header">
+              <span class="logo">🏠 Batdongsan.com.vn</span>
+              <span class="tagline">Kênh thông tin số 1 về Bất động sản</span>
+            </div>
+            <div class="bds-content-area">
+              <h4 class="bds-title">{{ displayTitle || 'Tin đăng bán nhà đất nổi bật' }}</h4>
+              <div class="bds-meta-strip">
+                <span class="meta-item red-text">💰 {{ displayPrice || 'Thỏa thuận' }}</span>
+                <span class="meta-item">📐 85 m²</span>
+                <span class="meta-item">📍 {{ displayLocation || 'Quận 2, TP. HCM' }}</span>
+              </div>
+              <div class="bds-body-text">
+                <textarea v-model="displayedText" rows="10" class="editor-textarea"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chotot Mockup -->
+          <div v-else-if="selectedChannel === 'chotot'" class="chotot-mockup glass-card">
+            <div class="chotot-header">
+              <span class="ct-logo">🏷️ CHỢ TỐT NHÀ</span>
+            </div>
+            <div class="chotot-content">
+              <h4 class="ct-title">{{ displayTitle || 'Tin đăng bán nhà đất nổi bật' }}</h4>
+              <div class="ct-price-strip">
+                <span class="ct-price">{{ displayPrice || 'Thỏa thuận' }}</span>
+                <span class="ct-tag-broker">Môi giới</span>
+              </div>
+              <div class="ct-body-text">
+                <textarea v-model="displayedText" rows="10" class="editor-textarea"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Alonhadat Mockup -->
+          <div v-else-if="selectedChannel === 'alonhadat'" class="alonhadat-mockup glass-card">
+            <div class="alonhadat-header">
+              <span class="ald-logo">🏘️ ALONHADAT.COM.VN</span>
+            </div>
+            <div class="alonhadat-content">
+              <h4 class="ald-title">{{ displayTitle || 'Tin đăng bán nhà đất nổi bật' }}</h4>
+              <div class="ald-specs">
+                <table class="ald-specs-table">
+                  <tbody>
+                    <tr>
+                      <td><strong>Giá:</strong> {{ displayPrice || 'Thỏa thuận' }}</td>
+                      <td><strong>Diện tích:</strong> 85 m²</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Pháp lý:</strong> Sổ đỏ/Sổ hồng</td>
+                      <td><strong>Hướng:</strong> Đông Nam</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="ald-body-text">
+                <textarea v-model="displayedText" rows="10" class="editor-textarea"></textarea>
               </div>
             </div>
           </div>
@@ -373,7 +705,14 @@ function mapPostStatus(status: string): 'draft' | 'review' | 'approved' | 'publi
             <td class="item-title">{{ item.title }}</td>
             <td>
               <span class="channel-tag" :class="item.channel">
-                {{ item.channel === 'facebook' ? 'Facebook' : item.channel === 'zalo' ? 'Zalo' : item.channel === 'seo' ? 'SEO' : 'Tin đăng' }}
+                {{ 
+                  item.channel === 'facebook' ? 'Facebook' : 
+                  item.channel === 'zalo' ? 'Zalo' : 
+                  item.channel === 'seo' ? 'SEO' : 
+                  item.channel === 'batdongsan' ? 'Batdongsan.com.vn' : 
+                  item.channel === 'chotot' ? 'Chợ Tốt' : 
+                  item.channel === 'alonhadat' ? 'Alo Nhà Đất' : 'Tin đăng BĐS' 
+                }}
               </span>
             </td>
             <td>
@@ -384,11 +723,40 @@ function mapPostStatus(status: string): 'draft' | 'review' | 'approved' | 'publi
             <td>{{ item.owner }}</td>
             <td>{{ new Date(item.updatedAt).toLocaleDateString('vi-VN') }}</td>
             <td>
-              <button class="action-btn-copy" @click="toastStore.success('Đã sao chép', 'Đã copy nội dung lịch sử.')">Copy</button>
+              <div style="display: flex; gap: 8px;">
+                <button class="action-btn-copy" @click="copyHistoryContent(item.id)">Copy</button>
+                <button class="action-btn-publish" @click="publishHistoryPost(item.id, item.channel)">Đăng bài</button>
+                <button class="action-btn-delete" @click="deleteHistoryPost(item.id)">Ẩn</button>
+              </div>
             </td>
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- MODAL ĐĂNG NHÓM FACEBOOK -->
+    <div v-if="showGroupModal" class="modal-overlay" @click.self="showGroupModal = false">
+      <div class="modal-content glass-card animate-fade">
+        <h3>📢 Đăng bài lên nhóm Facebook</h3>
+        <p class="modal-desc">Nội dung bài viết đã được sao chép vào bộ nhớ tạm (Clipboard). Hãy bấm vào từng nhóm dưới đây để dán (Ctrl+V) và đăng bài:</p>
+        
+        <div class="group-links-list">
+          <a 
+            v-for="(groupId, index) in activeGroups" 
+            :key="groupId" 
+            :href="'https://www.facebook.com/groups/' + groupId" 
+            target="_blank" 
+            class="group-link-item"
+            @click="toastStore.success('Đã mở nhóm', 'Hãy nhấn Ctrl+V để đăng bài.')"
+          >
+            👥 Mở nhóm {{ index + 1 }} (ID: {{ groupId }})
+          </a>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" @click="showGroupModal = false">Đóng</button>
+        </div>
+      </div>
     </div>
   </div>
   </RoleGate>
@@ -562,6 +930,28 @@ function mapPostStatus(status: string): 'draft' | 'review' | 'approved' | 'publi
   cursor: not-allowed;
 }
 
+.form-input-text {
+  height: 38px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-canvas);
+  border-radius: 8px;
+  padding: 0 12px;
+  font-size: 12.5px;
+  color: var(--color-text-primary);
+  transition: border-color var(--duration-fast);
+}
+
+.form-input-text:focus {
+  border-color: var(--color-yellow);
+  outline: none;
+}
+
+.input-help {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
 .spinner-inline {
   width: 16px;
   height: 16px;
@@ -687,6 +1077,45 @@ function mapPostStatus(status: string): 'draft' | 'review' | 'approved' | 'publi
   padding: 0 12px;
   border-radius: 6px;
   cursor: pointer;
+}
+
+.publish-btn {
+  background-color: var(--color-ai);
+  color: #ffffff;
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.publish-btn:hover {
+  opacity: 0.9;
+}
+
+.publish-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.action-btn-publish {
+  background: var(--color-ai-bg);
+  border: 1px solid var(--color-ai-border);
+  color: var(--color-ai);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.action-btn-publish:hover {
+  opacity: 0.8;
 }
 
 /* Facebook mockup */
@@ -824,6 +1253,200 @@ function mapPostStatus(status: string): 'draft' | 'review' | 'approved' | 'publi
   margin-top: 4px;
 }
 
+/* Batdongsan Mockup */
+.batdongsan-mockup {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-color: #005a3c;
+}
+
+.bds-header {
+  background-color: #005a3c;
+  color: #ffffff;
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.bds-header .logo {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.bds-header .tagline {
+  font-size: 10.5px;
+  opacity: 0.8;
+}
+
+.bds-content-area {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bds-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+}
+
+.bds-meta-strip {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  border-bottom: 1px dashed var(--color-border);
+  padding-bottom: 12px;
+}
+
+.bds-meta-strip .red-text {
+  color: #e03c3c;
+  font-weight: 700;
+}
+
+.bds-body-text {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+/* Chotot Mockup */
+.chotot-mockup {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-color: #ffba00;
+}
+
+.chotot-header {
+  background-color: #ffba00;
+  color: #1e293b;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+}
+
+.chotot-header .ct-logo {
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.chotot-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ct-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+}
+
+.ct-price-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px dashed var(--color-border);
+  padding-bottom: 12px;
+}
+
+.ct-price {
+  color: #ff5a00;
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.ct-tag-broker {
+  background-color: var(--color-divider);
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.ct-body-text {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+/* Alonhadat Mockup */
+.alonhadat-mockup {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-color: #0076a3;
+}
+
+.alonhadat-header {
+  background-color: #0076a3;
+  color: #ffffff;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+}
+
+.alonhadat-header .ald-logo {
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+
+.alonhadat-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ald-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+}
+
+.ald-specs {
+  border-bottom: 1px dashed var(--color-border);
+  padding-bottom: 12px;
+}
+
+.ald-specs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+  color: var(--color-text-secondary);
+}
+
+.ald-specs-table td {
+  padding: 4px 0;
+  width: 50%;
+}
+
+.ald-specs-table strong {
+  color: var(--color-text-muted);
+}
+
+.ald-body-text {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 10px;
+}
+
 /* Document / SEO Mockup */
 .generic-mockup {
   display: flex;
@@ -895,6 +1518,9 @@ function mapPostStatus(status: string): 'draft' | 'review' | 'approved' | 'publi
 .channel-tag.zalo { background-color: rgba(14, 165, 233, 0.15); color: #0ea5e9; }
 .channel-tag.seo { background-color: rgba(168, 85, 247, 0.15); color: #a855f7; }
 .channel-tag.listing { background-color: rgba(16, 185, 129, 0.15); color: #10b981; }
+.channel-tag.batdongsan { background-color: rgba(0, 90, 60, 0.15); color: #005a3c; }
+.channel-tag.chotot { background-color: rgba(255, 186, 0, 0.15); color: #d97706; }
+.channel-tag.alonhadat { background-color: rgba(0, 118, 163, 0.15); color: #0076a3; }
 
 .status-lbl {
   font-size: 9px;
@@ -920,5 +1546,110 @@ function mapPostStatus(status: string): 'draft' | 'review' | 'approved' | 'publi
 
 .action-btn-copy:hover {
   background: var(--color-surface-hover);
+}
+
+/* Modal styles for manual Facebook group links popup */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(3, 7, 18, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.modal-content {
+  width: 420px;
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: var(--elevation-floating);
+}
+
+.modal-content h3 {
+  margin: 0;
+  font-size: 15px;
+  color: var(--color-text-primary);
+}
+
+.modal-desc {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.group-links-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.group-link-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  border-radius: 8px;
+  background-color: var(--color-yellow);
+  color: var(--color-yellow-text);
+  font-weight: 700;
+  font-size: 13px;
+  text-decoration: none;
+  transition: all var(--duration-fast);
+  box-shadow: var(--color-yellow-glow);
+}
+
+.group-link-item:hover {
+  background-color: var(--color-yellow-hover);
+  transform: translateY(-2px);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-cancel {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+
+.btn-cancel:hover {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+/* History table styles */
+.action-btn-delete {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+
+.action-btn-delete:hover {
+  background-color: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
 }
 </style>
