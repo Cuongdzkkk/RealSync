@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { mockUsers } from '@/utils/mockData'
 
@@ -15,23 +16,20 @@ const emailError = ref('')
 const passwordError = ref('')
 
 const form = reactive({
-  email: '',
-  password: ''
-})
+  email: 'admin@realsync.vn',
+  password: 'Admin@123'
+});
 
 const validate = () => {
   let valid = true
+
   emailError.value = ''
   passwordError.value = ''
 
   if (!form.email) {
     emailError.value = 'Vui lòng nhập email'
     valid = false
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-    emailError.value = 'Email không hợp lệ'
-    valid = false
   }
-
   if (!form.password) {
     passwordError.value = 'Vui lòng nhập mật khẩu'
     valid = false
@@ -67,6 +65,7 @@ const handleSubmit = () => {
     localStorage.setItem('realsync.accessToken', 'mock-token')
     localStorage.setItem('realsync.user', JSON.stringify(profile))
     loading.value = false
+    ElMessage.success('Đăng nhập thành công')
     router.push('/admin/dashboard')
   }, 1000)
 }

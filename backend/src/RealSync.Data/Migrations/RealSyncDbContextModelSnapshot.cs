@@ -453,6 +453,56 @@ namespace RealSync.Data.Migrations
                     b.ToTable("Customers", (string)null);
                 });
 
+            modelBuilder.Entity("RealSync.Core.Entities.FollowUpReminderDispatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("LeadId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("NotificationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("ScheduledFor")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NotificationId");
+
+                    b.HasIndex("ScheduledFor");
+
+                    b.HasIndex("SentAt");
+
+                    b.HasIndex("LeadId", "ScheduledFor")
+                        .IsUnique();
+
+                    b.ToTable("FollowUpReminderDispatches", (string)null);
+                });
+
             modelBuilder.Entity("RealSync.Core.Entities.Lead", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1591,6 +1641,25 @@ namespace RealSync.Data.Migrations
                     b.Navigation("AssignedTo");
 
                     b.Navigation("ConvertedFromLead");
+                });
+
+            modelBuilder.Entity("RealSync.Core.Entities.FollowUpReminderDispatch", b =>
+                {
+                    b.HasOne("RealSync.Core.Entities.Lead", "Lead")
+                        .WithMany()
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("RealSync.Core.Entities.Notification", "Notification")
+                        .WithMany()
+                        .HasForeignKey("NotificationId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Lead");
+
+                    b.Navigation("Notification");
                 });
 
             modelBuilder.Entity("RealSync.Core.Entities.Lead", b =>

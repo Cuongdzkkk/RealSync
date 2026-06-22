@@ -14,7 +14,7 @@ interface NavItem {
   to: string;
   icon: string; // SVG path
   group: 'crm' | 'properties' | 'ai' | 'crawler' | 'analytics' | 'admin';
-  roles: ('Admin' | 'Manager' | 'Sales' | 'Marketing' | 'Data Analyst')[];
+  roles: ('Admin' | 'Manager' | 'Sales' | 'Marketing' | 'Data Analyst' | 'Agent' | 'Viewer')[];
   badge?: string;
   isAi?: boolean;
 }
@@ -30,12 +30,26 @@ const navItems: NavItem[] = [
   },
   // CRM Group
   {
-    label: 'Khách hàng (Leads)',
+    label: 'Lead tiềm năng',
     to: '/admin/leads',
     icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
     group: 'crm',
-    roles: ['Admin', 'Manager', 'Sales'],
+    roles: ['Admin', 'Manager', 'Sales', 'Agent'],
     badge: 'Hot'
+  },
+  {
+    label: 'Khách hàng',
+    to: '/admin/customers',
+    icon: 'M16 11c1.657 0 3-1.567 3-3.5S17.657 4 16 4s-3 1.567-3 3.5S14.343 11 16 11zM8 11c1.657 0 3-1.567 3-3.5S9.657 4 8 4 5 5.567 5 7.5 6.343 11 8 11zM8 13c-2.667 0-5 1.333-5 3v2h10v-2c0-1.667-2.333-3-5-3zM16 13c-.63 0-1.232.074-1.78.21 1.093.72 1.78 1.69 1.78 2.79v2h5v-2c0-1.667-2.333-3-5-3z',
+    group: 'crm',
+    roles: ['Admin', 'Manager', 'Sales', 'Agent', 'Viewer']
+  },
+  {
+    label: 'Thông báo',
+    to: '/admin/notifications',
+    icon: 'M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0',
+    group: 'crm',
+    roles: ['Admin', 'Manager', 'Sales', 'Agent', 'Viewer', 'Marketing', 'Data Analyst']
   },
   // Properties Group
   {
@@ -43,7 +57,14 @@ const navItems: NavItem[] = [
     to: '/admin/properties',
     icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3',
     group: 'properties',
-    roles: ['Admin', 'Sales', 'Marketing']
+    roles: ['Admin', 'Manager', 'Sales', 'Marketing', 'Data Analyst']
+  },
+  {
+    label: 'Danh mục BĐS',
+    to: '/admin/property-categories',
+    icon: 'M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z',
+    group: 'properties',
+    roles: ['Admin', 'Manager', 'Marketing']
   },
   {
     label: 'Dự án',
@@ -105,7 +126,7 @@ function handleLogout() {
 
 // Filter nav items based on user role
 const filteredNavItems = computed(() => {
-  return navItems.filter(item => item.roles.includes(currentRole.value as any));
+  return navItems.filter(item => item.roles.some((role) => role === currentRole.value));
 });
 
 const isActive = (to: string) => route.path === to || route.path.startsWith(to + '/');

@@ -1,0 +1,611 @@
+{
+  "info": {
+    "name": "RealSync CRM",
+    "description": "CRM API collection for Leads, Customers, Notifications, and CRM Analytics.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "stamp",
+      "value": "{{$timestamp}}"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.accessToken) {",
+                  "  pm.environment.set('token', json.data.accessToken);",
+                  "}",
+                  "if (json.data && json.data.user && json.data.user.id) {",
+                  "  pm.environment.set('assignedUserId', json.data.user.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@realsync.vn\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Leads CRUD",
+      "item": [
+        {
+          "name": "Create Lead",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.id) {",
+                  "  pm.environment.set('leadId', json.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Postman Lead {{$timestamp}}\",\n  \"phone\": \"0901234567\",\n  \"email\": \"postman.lead.{{$timestamp}}@example.com\",\n  \"score\": 80,\n  \"sourceChannel\": \"Website\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/leads"
+          }
+        },
+        {
+          "name": "Get Leads",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/leads?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "Get Lead Detail",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/leads/{{leadId}}"
+          }
+        },
+        {
+          "name": "Update Lead",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Postman Lead Updated\",\n  \"priority\": \"High\",\n  \"score\": 85\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/leads/{{leadId}}"
+          }
+        },
+        {
+          "name": "Delete Lead",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/v1/leads/{{leadId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Lead Workflow",
+      "item": [
+        {
+          "name": "Update Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Qualified\",\n  \"note\": \"Qualified from Postman\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/leads/{{leadId}}/status"
+          }
+        },
+        {
+          "name": "Assign Lead",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignedToId\": \"{{assignedUserId}}\",\n  \"note\": \"Assigned from Postman\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/leads/{{leadId}}/assign"
+          }
+        },
+        {
+          "name": "Add Activity",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"Call\",\n  \"description\": \"Postman call activity\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/leads/{{leadId}}/activities"
+          }
+        },
+        {
+          "name": "Get Activities",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/leads/{{leadId}}/activities"
+          }
+        },
+        {
+          "name": "Set Follow-up",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nextFollowUpAt\": \"2030-01-01T09:00:00Z\",\n  \"note\": \"Future follow-up from Postman\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/leads/{{leadId}}/follow-up"
+          }
+        },
+        {
+          "name": "Filter Overdue Follow-up",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/leads?overdueFollowUp=true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "Create Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.id) {",
+                  "  pm.environment.set('customerId', json.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Postman Customer {{$timestamp}}\",\n  \"phone\": \"0912345678\",\n  \"source\": \"Referral\",\n  \"company\": \"RealSync\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/customers"
+          }
+        },
+        {
+          "name": "Get Customers",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/customers?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "Get Customer Detail",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/customers/{{customerId}}"
+          }
+        },
+        {
+          "name": "Update Customer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company\": \"RealSync Updated\",\n  \"notes\": \"Updated from Postman\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/customers/{{customerId}}"
+          }
+        },
+        {
+          "name": "Get Customer Activities",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/customers/{{customerId}}/activities"
+          }
+        },
+        {
+          "name": "Convert Lead To Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.id) {",
+                  "  pm.environment.set('customerId', json.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company\": \"Converted Co\",\n  \"address\": \"District 1\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/leads/{{leadId}}/convert-to-customer"
+          }
+        },
+        {
+          "name": "Duplicate Convert Negative Test",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": "{{baseUrl}}/api/v1/leads/{{leadId}}/convert-to-customer"
+          }
+        },
+        {
+          "name": "Delete Customer",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/v1/customers/{{customerId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get Notifications",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.length > 0) {",
+                  "  pm.environment.set('notificationId', json.data[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/notifications?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "Get Notification Detail",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/notifications/{{notificationId}}"
+          }
+        },
+        {
+          "name": "Get Unread Count",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/notifications/unread-count"
+          }
+        },
+        {
+          "name": "Get Summary",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/notifications/summary"
+          }
+        },
+        {
+          "name": "Mark Read",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/v1/notifications/{{notificationId}}/read"
+          }
+        },
+        {
+          "name": "Mark All Read",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/v1/notifications/read-all"
+          }
+        },
+        {
+          "name": "Delete Notification",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/v1/notifications/{{notificationId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "CRM Analytics",
+      "item": [
+        {
+          "name": "Summary",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/crm/analytics/summary"
+          }
+        },
+        {
+          "name": "Leads by Status",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/crm/analytics/leads-by-status"
+          }
+        },
+        {
+          "name": "Leads by Source",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/crm/analytics/leads-by-source"
+          }
+        },
+        {
+          "name": "Conversion",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/crm/analytics/conversion"
+          }
+        },
+        {
+          "name": "Follow-ups",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/crm/analytics/follow-ups"
+          }
+        },
+        {
+          "name": "Customers",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/crm/analytics/customers"
+          }
+        },
+        {
+          "name": "Monthly Trend",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/crm/analytics/monthly-trend?year=2026"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Negative Tests",
+      "item": [
+        {
+          "name": "Create Lead without phone/email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"No Contact Lead\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/leads"
+          }
+        },
+        {
+          "name": "Update invalid lead status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"InvalidStatus\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/leads/{{leadId}}/status"
+          }
+        },
+        {
+          "name": "Assign invalid user",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignedToId\": \"00000000-0000-0000-0000-000000000001\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/leads/{{leadId}}/assign"
+          }
+        },
+        {
+          "name": "Add invalid activity type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"Invalid\",\n  \"description\": \"Should fail\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/leads/{{leadId}}/activities"
+          }
+        },
+        {
+          "name": "Follow-up past date",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nextFollowUpAt\": \"2020-01-01T00:00:00Z\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/leads/{{leadId}}/follow-up"
+          }
+        },
+        {
+          "name": "Convert already converted lead",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": "{{baseUrl}}/api/v1/leads/{{leadId}}/convert-to-customer"
+          }
+        },
+        {
+          "name": "Get deleted notification",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/notifications/{{notificationId}}"
+          }
+        },
+        {
+          "name": "Access notification of another user",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/notifications/00000000-0000-0000-0000-000000000001"
+          }
+        }
+      ]
+    }
+  ]
+}

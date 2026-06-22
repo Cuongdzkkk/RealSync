@@ -12,8 +12,9 @@ const stageLabels: Record<LeadStage, string> = {
   new: 'Mới',
   contacted: 'Đã liên hệ',
   qualified: 'Đủ điều kiện',
-  viewing: 'Đi xem',
-  closed: 'Đã chốt'
+  proposal: 'Đang đề xuất',
+  won: 'Thành công',
+  lost: 'Thất bại'
 };
 </script>
 
@@ -38,7 +39,7 @@ const stageLabels: Record<LeadStage, string> = {
 .lead-kanban {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(5, minmax(220px, 1fr));
+  grid-template-columns: repeat(6, minmax(220px, 1fr));
   overflow-x: auto;
 }
 

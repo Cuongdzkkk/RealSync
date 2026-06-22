@@ -48,6 +48,24 @@ const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: 'properties/create',
+        name: 'property-create',
+        component: () => import('@/views/properties/PropertyFormView.vue'),
+        meta: { title: 'Tạo bất động sản' }
+      },
+      {
+        path: 'properties/:id/edit',
+        name: 'property-edit',
+        component: () => import('@/views/properties/PropertyFormView.vue'),
+        meta: { title: 'Chỉnh sửa bất động sản' }
+      },
+      {
+        path: 'property-categories',
+        name: 'property-categories',
+        component: () => import('@/views/properties/PropertyCategoryView.vue'),
+        meta: { title: 'Danh mục bất động sản' }
+      },
+      {
         path: 'projects',
         name: 'projects',
         component: () => import('@/views/projects/ProjectListView.vue'),
@@ -67,11 +85,52 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'leads',
-        name: 'leads',
+        name: 'lead-list',
         component: () => import('@/views/leads/LeadListView.vue'),
         meta: {
+          title: 'Lead tiềm năng',
+          roles: ['Admin', 'Manager', 'Sales', 'Agent'],
+          defaultTimelineOpen: false
+        }
+      },
+      {
+        path: 'leads/:id',
+        name: 'lead-detail',
+        component: () => import('@/views/leads/LeadDetailView.vue'),
+        meta: {
+          title: 'Chi tiết Lead',
+          roles: ['Admin', 'Manager', 'Sales', 'Agent'],
+          defaultTimelineOpen: false
+        }
+      },
+      {
+        path: 'customers',
+        name: 'customer-list',
+        component: () => import('@/views/customers/CustomerListView.vue'),
+        meta: {
           title: 'Khách hàng',
-          roles: ['Admin', 'Manager', 'Sales']
+          roles: ['Admin', 'Manager', 'Sales', 'Agent', 'Viewer'],
+          defaultTimelineOpen: false
+        }
+      },
+      {
+        path: 'customers/:id',
+        name: 'customer-detail',
+        component: () => import('@/views/customers/CustomerDetailView.vue'),
+        meta: {
+          title: 'Chi tiết khách hàng',
+          roles: ['Admin', 'Manager', 'Sales', 'Agent', 'Viewer'],
+          defaultTimelineOpen: false
+        }
+      },
+      {
+        path: 'notifications',
+        name: 'notification-list',
+        component: () => import('@/views/notifications/NotificationListView.vue'),
+        meta: {
+          title: 'Thông báo',
+          roles: ['Admin', 'Manager', 'Sales', 'Agent', 'Viewer', 'Marketing', 'Data Analyst'],
+          defaultTimelineOpen: false
         }
       },
       {
@@ -119,6 +178,7 @@ declare module 'vue-router' {
   interface RouteMeta {
     title?: string;
     roles?: UserProfile['role'][];
+    defaultTimelineOpen?: boolean;
   }
 }
 

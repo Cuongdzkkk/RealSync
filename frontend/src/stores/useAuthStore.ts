@@ -15,7 +15,14 @@ function loadUser(): UserProfile | null {
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref(localStorage.getItem(storageKey));
-  const user = ref<UserProfile | null>(loadUser());
+  const user = ref<UserProfile | null>(accessToken.value
+    ? {
+        id: 'local-admin',
+        fullName: 'RealSync Admin',
+        email: 'admin@realsync.vn',
+        role: 'Admin'
+      }
+    : null);
   const loading = ref(false);
 
   // DEV mode luôn cho qua — còn gọi API thật sẽ có interceptor xử lý 401
