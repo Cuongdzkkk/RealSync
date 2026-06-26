@@ -51,6 +51,13 @@ const navItems: NavItem[] = [
     group: 'crm',
     roles: ['Admin', 'Manager', 'Sales', 'Agent', 'Viewer', 'Marketing', 'Data Analyst']
   },
+  {
+    label: 'Activity Log',
+    to: '/admin/activity-logs',
+    icon: 'M9 12h6m-6 4h6M8 4h8a2 2 0 012 2v12a2 2 0 01-2 2H8a2 2 0 01-2-2V6a2 2 0 012-2z',
+    group: 'crm',
+    roles: ['Admin', 'Manager']
+  },
   // Properties Group
   {
     label: 'Bất động sản',
