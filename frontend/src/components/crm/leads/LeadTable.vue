@@ -29,6 +29,8 @@ defineEmits<{
       :data="leads"
       row-key="id"
       class="crm-el-table"
+      max-height="calc(100vh - 320px)"
+      scrollbar-always-on
       @row-click="(row: CrmLead) => $emit('open', row)"
     >
       <el-table-column label="Lead" min-width="220">
@@ -74,7 +76,7 @@ defineEmits<{
       <el-table-column label="Follow-up" min-width="180">
         <template #default="{ row }"><LeadFollowUpBadge :date="row.nextFollowUpAt" :status="row.status" /></template>
       </el-table-column>
-      <el-table-column label="Thao tác" fixed="right" width="170">
+      <el-table-column label="Thao tác" width="220">
         <template #default="{ row }">
           <div class="actions" @click.stop>
             <el-tooltip content="Xem chi tiết">
@@ -104,7 +106,16 @@ defineEmits<{
 
 <style scoped>
 .lead-table {
-  overflow: hidden;
+  min-width: 0;
+  overflow: auto;
+}
+
+.lead-table :deep(.el-table) {
+  min-width: 1500px;
+}
+
+.lead-table :deep(.el-table__body-wrapper) {
+  overscroll-behavior: contain;
 }
 
 .lead-cell,
@@ -156,5 +167,11 @@ span {
 
 .actions {
   gap: 4px;
+  justify-content: flex-end;
+  min-width: 204px;
+}
+
+.actions :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 </style>

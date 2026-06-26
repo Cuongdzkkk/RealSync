@@ -23,9 +23,26 @@ const local = reactive({
 });
 
 let searchTimer: number | undefined;
+let syncingFromProps = false;
+
+function syncLocalQuery(query: CustomerQuery) {
+  syncingFromProps = true;
+  local.search = query.search;
+  local.source = query.source;
+  local.assignedToId = query.assignedToId;
+  local.origin = query.origin ?? 'all';
+  local.dateRange = query.fromDate && query.toDate ? [query.fromDate, query.toDate] : [];
+  local.sortBy = query.sortBy ?? 'createdAt';
+  local.sortDirection = query.sortDirection ?? 'desc';
+  queueMicrotask(() => {
+    syncingFromProps = false;
+  });
+}
+
 watch(
   () => local.search,
   (value) => {
+    if (syncingFromProps) return;
     window.clearTimeout(searchTimer);
     searchTimer = window.setTimeout(() => emit('change', { search: value, page: 1 }), 300);
   }
@@ -34,6 +51,7 @@ watch(
 watch(
   () => [local.source, local.assignedToId, local.origin, local.dateRange, local.sortBy, local.sortDirection],
   () => {
+    if (syncingFromProps) return;
     emit('change', {
       source: local.source,
       assignedToId: local.assignedToId,
@@ -50,15 +68,7 @@ watch(
 
 watch(
   () => props.query,
-  (query) => {
-    local.search = query.search;
-    local.source = query.source;
-    local.assignedToId = query.assignedToId;
-    local.origin = query.origin ?? 'all';
-    local.dateRange = query.fromDate && query.toDate ? [query.fromDate, query.toDate] : [];
-    local.sortBy = query.sortBy ?? 'createdAt';
-    local.sortDirection = query.sortDirection ?? 'desc';
-  },
+  syncLocalQuery,
   { deep: true }
 );
 </script>

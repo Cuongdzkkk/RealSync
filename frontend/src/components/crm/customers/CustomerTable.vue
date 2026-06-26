@@ -28,6 +28,8 @@ defineEmits<{
       :data="customers"
       row-key="id"
       class="crm-el-table"
+      max-height="calc(100vh - 320px)"
+      scrollbar-always-on
       @row-click="(row: CrmCustomerDetail) => $emit('open', row)"
     >
       <el-table-column label="Khách hàng" min-width="230">
@@ -66,7 +68,7 @@ defineEmits<{
       <el-table-column label="Ngày tạo" width="160">
         <template #default="{ row }"><span class="numeric">{{ formatDateTime(row.createdAt) }}</span></template>
       </el-table-column>
-      <el-table-column label="Thao tác" fixed="right" width="150">
+      <el-table-column label="Thao tác" width="190">
         <template #default="{ row }">
           <div class="actions" @click.stop>
             <el-tooltip content="Xem chi tiết">
@@ -93,7 +95,16 @@ defineEmits<{
 
 <style scoped>
 .customer-table {
-  overflow: hidden;
+  min-width: 0;
+  overflow: auto;
+}
+
+.customer-table :deep(.el-table) {
+  min-width: 1280px;
+}
+
+.customer-table :deep(.el-table__body-wrapper) {
+  overscroll-behavior: contain;
 }
 
 .identity,
@@ -157,5 +168,11 @@ small,
 
 .actions {
   gap: 4px;
+  justify-content: flex-end;
+  min-width: 164px;
+}
+
+.actions :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 </style>

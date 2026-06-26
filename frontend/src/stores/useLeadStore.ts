@@ -37,6 +37,10 @@ const defaultQuery: LeadQuery = {
   sortDirection: 'desc'
 };
 
+function isSameQuery(left: LeadQuery, right: LeadQuery): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 function initialViewMode(): LeadViewMode {
   const saved = localStorage.getItem(VIEW_MODE_KEY);
   return saved === 'kanban' ? 'kanban' : 'table';
@@ -236,11 +240,14 @@ export const useLeadStore = defineStore('lead', () => {
   }
 
   function setQuery(partial: Partial<LeadQuery>) {
-    query.value = {
+    const nextQuery = {
       ...query.value,
       ...partial,
       page: partial.page ?? 1
     };
+
+    if (isSameQuery(query.value, nextQuery)) return;
+    query.value = nextQuery;
   }
 
   function resetFilters() {
