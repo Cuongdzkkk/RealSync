@@ -173,12 +173,15 @@ async function deleteCustomer(customer: CrmCustomerDetail) {
 .pagination-row {
   align-items: center;
   display: flex;
-  justify-content: flex-end;
+  gap: 12px;
+  justify-content: space-between;
   padding: 12px 14px;
 }
 
 @media (max-width: 768px) {
   .pagination-row {
+    align-items: flex-start;
+    flex-direction: column;
     justify-content: flex-start;
     overflow-x: auto;
   }

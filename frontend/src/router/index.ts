@@ -134,6 +134,16 @@ const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: 'activity-logs',
+        name: 'activity-log-list',
+        component: () => import('@/views/activity/ActivityLogView.vue'),
+        meta: {
+          title: 'Activity Log',
+          roles: ['Admin', 'Manager'],
+          defaultTimelineOpen: false
+        }
+      },
+      {
         path: 'crawlers',
         name: 'crawlers',
         component: () => import('@/views/crawlers/CrawlerView.vue'),

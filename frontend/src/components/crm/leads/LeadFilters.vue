@@ -26,9 +26,26 @@ const local = reactive({
 const activeUsers = computed(() => mockCrmUsers.filter((user) => user.isActive));
 
 let searchTimer: number | undefined;
+let syncingFromProps = false;
+
+function syncLocalQuery(query: LeadQuery) {
+  syncingFromProps = true;
+  local.search = query.search;
+  local.status = query.status;
+  local.priority = query.priority;
+  local.sourceChannel = query.sourceChannel;
+  local.assignedToId = query.assignedToId;
+  local.followUpState = query.followUpState ?? 'all';
+  local.scoreRange = [query.minScore ?? 0, query.maxScore ?? 100];
+  queueMicrotask(() => {
+    syncingFromProps = false;
+  });
+}
+
 watch(
   () => local.search,
   (value) => {
+    if (syncingFromProps) return;
     window.clearTimeout(searchTimer);
     searchTimer = window.setTimeout(() => emit('change', { search: value, page: 1 }), 300);
   }
@@ -37,6 +54,7 @@ watch(
 watch(
   () => [local.status, local.priority, local.sourceChannel, local.assignedToId, local.followUpState, local.scoreRange[0], local.scoreRange[1]],
   () => {
+    if (syncingFromProps) return;
     emit('change', {
       status: local.status,
       priority: local.priority,
@@ -52,15 +70,7 @@ watch(
 
 watch(
   () => props.query,
-  (query) => {
-    local.search = query.search;
-    local.status = query.status;
-    local.priority = query.priority;
-    local.sourceChannel = query.sourceChannel;
-    local.assignedToId = query.assignedToId;
-    local.followUpState = query.followUpState ?? 'all';
-    local.scoreRange = [query.minScore ?? 0, query.maxScore ?? 100];
-  },
+  syncLocalQuery,
   { deep: true }
 );
 </script>

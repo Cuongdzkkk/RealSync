@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick } from 'vue';
+import { ref, nextTick, computed, onMounted } from 'vue';
 import { api } from '@/services/api';
 
 interface Message {
@@ -11,6 +11,12 @@ interface Message {
 }
 
 const isOpen = ref(false);
+const isVisible = ref(true);
+const isDragging = ref(false);
+const didDrag = ref(false);
+const position = ref({ x: 0, y: 0 });
+const dragOffset = ref({ x: 0, y: 0 });
+const dragStart = ref({ x: 0, y: 0 });
 const inputMsg = ref('');
 const messages = ref<Message[]>([
   {
@@ -30,11 +36,96 @@ const quickActions = [
   'Phân tích nguồn lead'
 ];
 
+const wrapperStyle = computed(() => ({
+  left: `${position.value.x}px`,
+  top: `${position.value.y}px`
+}));
+
+const chatAlignmentClass = computed(() => ({
+  'ai-chat-window--align-left': position.value.x < 360
+}));
+
+onMounted(() => {
+  position.value = {
+    x: window.innerWidth - 84,
+    y: window.innerHeight - 84
+  };
+});
+
 function toggleOpen() {
+  if (didDrag.value) {
+    didDrag.value = false;
+    return;
+  }
+
   isOpen.value = !isOpen.value;
   if (isOpen.value) {
     scrollToBottom();
   }
+}
+
+function toggleVisible() {
+  if (didDrag.value) {
+    didDrag.value = false;
+    return;
+  }
+
+  isVisible.value = !isVisible.value;
+  if (!isVisible.value) {
+    isOpen.value = false;
+  }
+}
+
+function clampPosition(x: number, y: number) {
+  const edgePadding = 8;
+  const maxX = window.innerWidth - 60;
+  const maxY = window.innerHeight - 60;
+
+  return {
+    x: Math.min(Math.max(x, edgePadding), maxX),
+    y: Math.min(Math.max(y, edgePadding), maxY)
+  };
+}
+
+function startDrag(event: PointerEvent) {
+  if (event.button !== 0) return;
+
+  const target = event.target as HTMLElement;
+  if (target.closest('input, form, .chat-messages, .quick-action-btn, .send-btn, .close-btn, .ai-visibility-btn')) {
+    return;
+  }
+
+  isDragging.value = true;
+  didDrag.value = false;
+  dragOffset.value = {
+    x: event.clientX - position.value.x,
+    y: event.clientY - position.value.y
+  };
+  dragStart.value = {
+    x: event.clientX,
+    y: event.clientY
+  };
+
+  window.addEventListener('pointermove', handleDrag);
+  window.addEventListener('pointerup', stopDrag, { once: true });
+}
+
+function handleDrag(event: PointerEvent) {
+  if (!isDragging.value) return;
+
+  const distance = Math.hypot(event.clientX - dragStart.value.x, event.clientY - dragStart.value.y);
+  if (distance < 4) return;
+
+  didDrag.value = true;
+  position.value = clampPosition(
+    event.clientX - dragOffset.value.x,
+    event.clientY - dragOffset.value.y
+  );
+}
+
+function stopDrag() {
+  isDragging.value = false;
+  window.removeEventListener('pointermove', handleDrag);
 }
 
 function scrollToBottom() {
@@ -128,7 +219,37 @@ function getAIResponse(query: string): string {
 </script>
 
 <template>
-  <div class="floating-ai-wrapper">
+  <div
+    class="floating-ai-wrapper"
+    :class="{ 'is-hidden': !isVisible, 'is-dragging': isDragging }"
+    :style="wrapperStyle"
+    @pointerdown="startDrag"
+  >
+    <button
+      v-if="!isVisible"
+      class="ai-restore-btn"
+      type="button"
+      title="Hiện AI Copilot"
+      aria-label="Hiện AI Copilot"
+      @click="toggleVisible"
+    >
+      AI
+    </button>
+
+    <template v-else>
+    <button
+      class="ai-visibility-btn"
+      type="button"
+      title="Ẩn AI Copilot"
+      aria-label="Ẩn AI Copilot"
+      @click="toggleVisible"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 6 6 18" />
+        <path d="m6 6 12 12" />
+      </svg>
+    </button>
+
     <!-- Trigger Button -->
     <button 
       class="ai-trigger-btn glow-ai" 
@@ -147,8 +268,8 @@ function getAIResponse(query: string): string {
     </button>
 
     <!-- AI Chat Window -->
-    <div v-if="isOpen" class="ai-chat-window glass-card">
-      <div class="chat-header">
+    <div v-if="isOpen" class="ai-chat-window glass-card" :class="chatAlignmentClass">
+      <div class="chat-header" title="Kéo để di chuyển">
         <div class="header-info">
           <div class="ai-avatar">AI</div>
           <div>
@@ -210,15 +331,67 @@ function getAIResponse(query: string): string {
         </button>
       </form>
     </div>
+    </template>
   </div>
 </template>
 
 <style scoped>
 .floating-ai-wrapper {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
   z-index: var(--z-toast);
+  touch-action: none;
+  user-select: none;
+}
+
+.floating-ai-wrapper.is-hidden {
+  right: auto;
+}
+
+.floating-ai-wrapper.is-dragging {
+  cursor: grabbing;
+}
+
+.ai-restore-btn,
+.ai-visibility-btn {
+  align-items: center;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--elevation-surface);
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.ai-restore-btn {
+  background: var(--color-text-primary);
+  border-radius: 10px 0 0 10px;
+  color: var(--color-canvas);
+  font-size: 11px;
+  font-weight: 800;
+  height: 42px;
+  letter-spacing: 0;
+  width: 42px;
+}
+
+.ai-restore-btn:hover {
+  transform: translateX(-4px);
+}
+
+.ai-visibility-btn {
+  background: var(--color-surface);
+  border-radius: 50%;
+  color: var(--color-text-muted);
+  height: 26px;
+  position: absolute;
+  right: -8px;
+  top: -10px;
+  width: 26px;
+  z-index: 2;
+}
+
+.ai-visibility-btn:hover {
+  color: var(--color-text-primary);
+  transform: scale(1.06);
 }
 
 .ai-trigger-btn {
@@ -234,6 +407,16 @@ function getAIResponse(query: string): string {
   justify-content: center;
   position: relative;
   transition: all var(--duration-base) var(--ease-spring);
+}
+
+.ai-trigger-btn,
+.chat-header {
+  cursor: grab;
+}
+
+.floating-ai-wrapper.is-dragging .ai-trigger-btn,
+.floating-ai-wrapper.is-dragging .chat-header {
+  cursor: grabbing;
 }
 
 .ai-trigger-btn:hover {
@@ -269,6 +452,11 @@ function getAIResponse(query: string): string {
   overflow: hidden;
   box-shadow: var(--elevation-floating);
   animation: fadein var(--duration-base) var(--ease-spring);
+}
+
+.ai-chat-window--align-left {
+  left: 0;
+  right: auto;
 }
 
 .chat-header {

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using RealSync.Core.Entities;
+using RealSync.Core.Enums;
 using RealSync.Core.Interfaces;
 using RealSync.Data.Context;
 using RealSync.Shared.DTOs.Requests.Auth;
@@ -21,11 +22,16 @@ public class AuthService : IAuthService
 {
     private readonly RealSyncDbContext _context;
     private readonly IConfiguration _configuration;
+    private readonly IActivityLogService _activityLogService;
 
-    public AuthService(RealSyncDbContext context, IConfiguration configuration)
+    public AuthService(
+        RealSyncDbContext context,
+        IConfiguration configuration,
+        IActivityLogService activityLogService)
     {
         _context = context;
         _configuration = configuration;
+        _activityLogService = activityLogService;
     }
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request)
@@ -42,6 +48,14 @@ public class AuthService : IAuthService
 
         user.LastLoginAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
+        await _activityLogService.LogForUserAsync(
+            user.Id,
+            "Auth",
+            user.Id,
+            ActivityType.Login,
+            "User logged in",
+            null,
+            new { user.Email, user.FullName, role = user.Role.Name });
 
         return GenerateAuthResponse(user);
     }
@@ -70,6 +84,14 @@ public class AuthService : IAuthService
 
         // Reload với Role
         user.Role = defaultRole;
+        await _activityLogService.LogForUserAsync(
+            user.Id,
+            "User",
+            user.Id,
+            ActivityType.Create,
+            "User registered",
+            null,
+            new { user.Email, user.FullName, role = defaultRole.Name });
 
         return GenerateAuthResponse(user);
     }

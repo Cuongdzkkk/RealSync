@@ -81,19 +81,10 @@ function generateAiContent() {
   if (aiGenerating.value) return;
   aiGenerating.value = true;
   generatedContent.value = '';
-  
-  toastStore.info(
-    'AI Processing',
-    'AI đang sinh nội dung tin đăng bất động sản...'
-  );
 
   setTimeout(() => {
     generatedContent.value = `💎 **CƠ HỘI ĐẦU TƯ & AN CƯ THƯỢNG LƯU TẠI LANDMARK 81** 💎\n\n📍 **Vị trí**: Tòa nhà Landmark 81, Vinhomes Central Park, Bình Thạnh, TP.HCM.\n📐 **Diện tích**: 86m² | Thiết kế sang trọng 2 Phòng ngủ, 2 WC rộng rãi.\n\n✨ **Đặc điểm nổi bật**:\n- Căn hộ tầng cao, ban công rộng sở hữu **view sông Sài Gòn trực diện** và công viên 14ha đắt giá.\n- Nội thất nhập khẩu cao cấp từ Châu Âu, thiết kế chuẩn chỉnh từng góc cạnh.\n- Đặc quyền cư dân: Hồ bơi vô cực, Gym & Spa chuẩn 5 sao, trung tâm thương mại lớn ngay chân tòa nhà.\n\n💵 **Giá chào thuê/bán cực tốt**: Liên hệ nhận báo giá chi tiết.\n📞 Hỗ trợ xem nhà thực tế 24/7.`;
     aiGenerating.value = false;
-    toastStore.success(
-      'Hoàn tất',
-      'Tin đăng AI được tạo thành công!'
-    );
   }, 2000);
 }
 

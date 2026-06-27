@@ -2,8 +2,10 @@ using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RealSync.Core.Entities;
+using RealSync.Core.Enums;
 using RealSync.Core.Interfaces;
 using RealSync.Data.Context;
 using RealSync.Services.Options;
@@ -25,19 +27,25 @@ public class AIContentService : IAIContentService
 
     private readonly RealSyncDbContext _context;
     private readonly ICurrentUserService _currentUser;
+    private readonly IActivityLogService _activityLogService;
     private readonly HttpClient _httpClient;
     private readonly AIOptions _aiOptions;
+    private readonly ILogger<AIContentService> _logger;
 
     public AIContentService(
         RealSyncDbContext context,
         ICurrentUserService currentUser,
+        IActivityLogService activityLogService,
         HttpClient httpClient,
-        IOptions<AIOptions> aiOptions)
+        IOptions<AIOptions> aiOptions,
+        ILogger<AIContentService> logger)
     {
         _context = context;
         _currentUser = currentUser;
+        _activityLogService = activityLogService;
         _httpClient = httpClient;
         _aiOptions = aiOptions.Value;
+        _logger = logger;
     }
 
     public async Task<AIContentGenerationResponse> GenerateAsync(
@@ -76,8 +84,32 @@ public class AIContentService : IAIContentService
 
         _context.AIContentGenerations.Add(generation);
         await _context.SaveChangesAsync();
+        await TryLogGenerationAsync(generation);
 
         return MapToResponse(generation);
+    }
+
+    private async Task TryLogGenerationAsync(AIContentGeneration generation)
+    {
+        try
+        {
+            await _activityLogService.LogAsync(
+                "AIContentGeneration",
+                generation.Id,
+                ActivityType.Create,
+                "Generated AI content for post",
+                null,
+                new
+                {
+                    generation.PostId,
+                    promptLength = generation.Prompt.Length,
+                    contentLength = generation.GeneratedContent?.Length ?? 0
+                });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to write activity log for AI content generation {GenerationId}", generation.Id);
+        }
     }
 
     // ============================================================

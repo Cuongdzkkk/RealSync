@@ -120,8 +120,6 @@ async function triggerGeneration() {
           clearInterval(interval);
         }
       }, 8);
-
-      toastStore.success('Tạo thành công', 'Nội dung AI đã được tạo từ hệ thống.');
     }, 600);
   } catch (error: any) {
     isGenerating.value = false;
