@@ -112,6 +112,7 @@ try
     app.UseCors("AllowFrontend");
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseMiddleware<ApiActivityAuditMiddleware>();
 
     app.MapControllers().RequireRateLimiting("GlobalPolicy");
     app.MapHealthChecks("/health");

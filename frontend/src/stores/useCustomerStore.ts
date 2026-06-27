@@ -27,6 +27,10 @@ const defaultQuery: CustomerQuery = {
   sortDirection: 'desc'
 };
 
+function isSameQuery(left: CustomerQuery, right: CustomerQuery): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 function readAllCustomers(): CrmCustomerDetail[] {
   const raw = localStorage.getItem('realsync.crm.mock.customers');
   if (!raw) return mockCustomers;
@@ -157,11 +161,14 @@ export const useCustomerStore = defineStore('customer', () => {
   }
 
   function setQuery(partial: Partial<CustomerQuery>) {
-    query.value = {
+    const nextQuery = {
       ...query.value,
       ...partial,
       page: partial.page ?? 1
     };
+
+    if (isSameQuery(query.value, nextQuery)) return;
+    query.value = nextQuery;
   }
 
   function resetFilters() {

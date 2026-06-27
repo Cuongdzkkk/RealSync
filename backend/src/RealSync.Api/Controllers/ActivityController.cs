@@ -1,28 +1,27 @@
 using Microsoft.AspNetCore.Mvc;
 using RealSync.Api.Filters;
-using RealSync.Core.Entities;
 using RealSync.Core.Interfaces;
-using RealSync.Shared.DTOs.Requests;
+using RealSync.Shared.DTOs.Requests.ActivityLogs;
+using RealSync.Shared.DTOs.Responses.ActivityLogs;
 
 namespace RealSync.Api.Controllers;
 
 public class ActivityController : BaseController
 {
-    private readonly IRepository<ActivityLog> _activityRepository;
+    private readonly IActivityLogService _activityLogService;
 
-    public ActivityController(IRepository<ActivityLog> activityRepository)
+    public ActivityController(IActivityLogService activityLogService)
     {
-        _activityRepository = activityRepository;
+        _activityLogService = activityLogService;
     }
 
     [HttpGet]
     [RequirePermission("system.logs")]
-    [ProducesResponseType(typeof(Shared.DTOs.Responses.ApiResponse<IEnumerable<ActivityLog>>), 200)]
-    public async Task<IActionResult> GetActivities([FromQuery] PaginationRequest pagination)
+    [ProducesResponseType(typeof(Shared.DTOs.Responses.ApiResponse<IReadOnlyList<ActivityLogDto>>), 200)]
+    public async Task<IActionResult> GetActivities([FromQuery] ActivityLogQueryDto query)
     {
-        // filter could be applied via search string if needed
-        var (items, totalCount) = await _activityRepository.GetPagedAsync(pagination);
+        var (items, totalCount) = await _activityLogService.GetActivityLogsAsync(query);
 
-        return PagedResponse(items, pagination.Page, pagination.PageSize, totalCount);
+        return PagedResponse(items, query.Page, query.PageSize, totalCount);
     }
 }
