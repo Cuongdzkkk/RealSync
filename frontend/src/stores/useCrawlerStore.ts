@@ -1,7 +1,7 @@
 import { ref } from 'vue';
 import { defineStore } from 'pinia';
 import type { CrawlSource } from '@/types/crawler';
-import { mockCrawlSources } from '@/utils/mockData';
+import { api } from '@/services/api';
 
 export interface CrawlerLog {
   id: string;
@@ -11,8 +11,18 @@ export interface CrawlerLog {
   message: string;
 }
 
+export interface CrawlRunResult {
+  jobId: string;
+  propertyId: string;
+  propertyTitle: string;
+  address: string;
+  price: number;
+  aiScore: number;
+  totalCreated?: number;
+}
+
 export const useCrawlerStore = defineStore('crawler', () => {
-  const sources = ref<CrawlSource[]>(mockCrawlSources);
+  const sources = ref<CrawlSource[]>([]);
   const logs = ref<CrawlerLog[]>([
     {
       id: 'log-1',
@@ -44,24 +54,66 @@ export const useCrawlerStore = defineStore('crawler', () => {
     }
   ]);
 
-  const activeCrawlingId = ref<string | null>(null);
+  const loading = ref(false);
 
-  const addSource = (source: CrawlSource) => {
-    sources.value.push(source);
-  };
+  async function fetchSources() {
+    loading.value = true;
+    try {
+      const { data: res } = await api.get('/crawlers/sources');
+      sources.value = res.data ?? [];
+    } catch (err: any) {
+      pushLog('System', 'error', err?.response?.data?.message || err?.message || 'Không tải được danh sách nguồn cào');
+    } finally {
+      loading.value = false;
+    }
+  }
 
-  const updateSource = (updated: CrawlSource) => {
+  async function runCrawler(
+    sourceId: string,
+    area: string,
+    province: string,
+    propertyType: string,
+    category: string,
+    enableAiFilter: boolean,
+    crawlMode: string = 'Property',
+    prompt: string = '',
+    useLocationFilter: boolean = true
+  ): Promise<CrawlRunResult> {
+    const { data: res } = await api.post(`/crawlers/sources/${sourceId}/run`, {
+      area,
+      province,
+      propertyType,
+      category,
+      enableAiFilter,
+      crawlMode,
+      prompt,
+      useLocationFilter
+    });
+
+    return res.data;
+  }
+
+  async function addSource(source: Omit<CrawlSource, 'id' | 'lastRunAt'>) {
+    const { data: res } = await api.post('/crawlers/sources', source);
+    sources.value.push(res.data);
+    return res.data as CrawlSource;
+  }
+
+  async function updateSource(updated: CrawlSource) {
+    const { data: res } = await api.put(`/crawlers/sources/${updated.id}`, updated);
     const idx = sources.value.findIndex(s => s.id === updated.id);
     if (idx !== -1) {
-      sources.value[idx] = updated;
+      sources.value[idx] = res.data;
     }
-  };
+    return res.data as CrawlSource;
+  }
 
-  const deleteSource = (id: string) => {
+  async function deleteSource(id: string) {
+    await api.delete(`/crawlers/sources/${id}`);
     sources.value = sources.value.filter(s => s.id !== id);
-  };
+  }
 
-  const pushLog = (source: string, type: 'info' | 'success' | 'warning' | 'error', message: string) => {
+  function pushLog(source: string, type: CrawlerLog['type'], message: string) {
     logs.value.unshift({
       id: `log-${Date.now()}-${Math.random()}`,
       timestamp: new Date().toISOString(),
@@ -69,19 +121,21 @@ export const useCrawlerStore = defineStore('crawler', () => {
       type,
       message
     });
-    // Cap logs at 100 entries
+
     if (logs.value.length > 100) {
       logs.value.pop();
     }
-  };
+  }
 
   return {
     sources,
     logs,
-    activeCrawlingId,
+    loading,
+    fetchSources,
     addSource,
     updateSource,
     deleteSource,
+    runCrawler,
     pushLog
   };
 });

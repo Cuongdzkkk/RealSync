@@ -602,6 +602,11 @@ Agent nên đọc các file sau để hiểu sâu hơn:
 | `references/ai-guide.md` | AI module integration guide |
 | `references/crawler-guide.md` | Crawler setup, rules |
 | `references/deployment-guide.md` | Deployment procedures |
+| `crawl4ai/SKILL.md` | Crawl4AI — Crawl JS-heavy sites, chống bot, batch crawl |
+| `scrapfly-scraper/SKILL.md` | Scrapfly Scraper — Anti-detect web scraping API |
+| `scrapfly-crawler/SKILL.md` | Scrapfly Crawler — Site-wide crawl + real-time progress |
+| `scrapfly-browser/SKILL.md` | Scrapfly Cloud Browser — Remote browser automation |
+| `crawler-tiered/SKILL.md` | Crawler 3 tầng — Tự động chọn chiến lược crawl |
 
 ## 17. 🎯 Quick Decision Tree
 

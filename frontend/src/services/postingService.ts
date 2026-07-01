@@ -25,7 +25,7 @@ export const postingService = {
   /** Sinh nội dung AI cho bài đăng */
   async generateContent(postId: string, request: AIContentGenerateRequest): Promise<AIContentGeneration> {
     const { data } = await api.post(`/posts/${postId}/ai-content/generate`, request, {
-      timeout: 120000
+      timeout: 35000
     });
     return data.data;
   },
@@ -63,5 +63,10 @@ export const postingService = {
   async publishChannel(postId: string, channelId: string): Promise<any> {
     const { data: res } = await api.post(`/posts/${postId}/channels/${channelId}/publish`);
     return res.data;
-  }
+  },
+
+  /** Áp dụng bản nháp AI đã chỉnh sửa */
+  async applyAiContent(postId: string, content: string, summary?: string): Promise<void> {
+    await api.post(`/posts/${postId}/ai-content/apply`, { content, summary });
+  },
 };

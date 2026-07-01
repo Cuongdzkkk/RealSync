@@ -1,0 +1,15 @@
+{
+  "name": "realsync-crawler",
+  "version": "1.0.0",
+  "description": "Patchright headed web scraper for RealSync (anti-detect, tiered)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "node-html-parser": "^6.1.13",
+    "patchright": "^1.49.1",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  }
+}

@@ -1,0 +1,7 @@
+Using launch settings from D:\A\RealSync\backend\src\RealSync.Api\Properties\launchSettings.json...
+Building...
+D:\A\RealSync\backend\src\RealSync.Services\RealSync.Services.csproj : warning NU1510: PackageReference Microsoft.Extensions.Configuration.Binder will not be pruned. Consider removing this package from your dependencies, as it is likely unnecessary. [D:\A\RealSync\backend\src\RealSync.Api\RealSync.Api.csproj]
+D:\A\RealSync\backend\src\RealSync.Services\RealSync.Services.csproj : warning NU1903: Package 'Newtonsoft.Json' 11.0.1 has a known high severity vulnerability, https://github.com/advisories/GHSA-5crp-9r3c-p9vr [D:\A\RealSync\backend\src\RealSync.Api\RealSync.Api.csproj]
+D:\A\RealSync\backend\src\RealSync.Services\RealSync.Services.csproj : warning NU1510: PackageReference Microsoft.Extensions.Configuration.Binder will not be pruned. Consider removing this package from your dependencies, as it is likely unnecessary.
+D:\A\RealSync\backend\src\RealSync.Services\RealSync.Services.csproj : warning NU1903: Package 'Newtonsoft.Json' 11.0.1 has a known high severity vulnerability, https://github.com/advisories/GHSA-5crp-9r3c-p9vr
+[15:12:25 WRN] Entity 'Permission' has a global query filter defined and is the required end of a relationship with the entity 'RolePermission'. This may lead to unexpected results when the required entity is filtered out. Either configure the navigation as optional, or define matching query filters for both entities in the navigation. See https://go.microsoft.com/fwlink/?linkid=2131316 for more information.

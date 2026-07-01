@@ -37,4 +37,8 @@ export interface AIContentGeneration {
   prompt: string;
   generatedContent: string;
   createdAt: string;
+  promptTokens?: number;
+  completionTokens?: number;
+  estimatedCost?: number;
+  factsUsedJson?: string;
 }

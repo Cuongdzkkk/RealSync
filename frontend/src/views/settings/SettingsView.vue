@@ -1,16 +1,20 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { useToastStore } from '@/stores/useToastStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { mockUsers, mockRoleCapabilities } from '@/utils/mockData';
 import type { WorkspaceUser } from '@/types/user';
 import { api } from '@/services/api';
+import { useConnectedAccountStore } from '@/stores/useConnectedAccountStore';
+import { connectedAccountService } from '@/services/connectedAccountService';
 
 const toastStore = useToastStore();
 const authStore = useAuthStore();
+const route = useRoute();
 
 // --- Active Tab State ---
-const activeTab = ref<'general' | 'ai' | 'crawler' | 'users' | 'channels'>('general');
+const activeTab = ref<'general' | 'ai' | 'crawler' | 'users' | 'channels' | 'connected-accounts'>('general');
 
 // --- General Config State ---
 const generalForm = ref({
@@ -177,6 +181,21 @@ onMounted(async () => {
   } catch (error) {
     // API interceptor will show the error toast
   }
+
+  // Load connected accounts
+  try {
+    await connectedAccountStore.fetchAccounts();
+  } catch (error) {
+    // API handler handles toast
+  }
+
+  if (route.query.tab === 'connected-accounts') {
+    activeTab.value = 'connected-accounts';
+  }
+  if (route.query.tiktok === 'connected') {
+    activeTab.value = 'connected-accounts';
+    toastStore.success('TikTok', 'Đã liên kết tài khoản TikTok thành công.');
+  }
 });
 
 async function handleSaveChannels() {
@@ -188,6 +207,257 @@ async function handleSaveChannels() {
     // API interceptor will show the error toast
   } finally {
     isSavingChannels.value = false;
+  }
+}
+
+// === CONNECTED ACCOUNTS LOGIC ===
+const connectedAccountStore = useConnectedAccountStore();
+
+const showAddAccountModal = ref(false);
+const showReconnectModal = ref(false);
+const showAuditLogsModal = ref(false);
+const showAdvancedSettings = ref(false);
+
+const accountForm = ref({
+  provider: 'Website',
+  channelType: 'Website',
+  displayName: '',
+  externalAccountId: '',
+  externalParentAccountId: '',
+  profileUrl: '',
+  avatarUrl: '',
+  accessToken: '',
+  refreshToken: '',
+  expiresInSeconds: null as number | null,
+  grantedScopesJson: ''
+});
+
+const reconnectForm = ref({
+  id: '',
+  displayName: '',
+  accessToken: '',
+  refreshToken: '',
+  expiresInSeconds: null as number | null
+});
+
+const selectedAccount = ref<any>(null);
+
+function openAddAccountModal() {
+  showAdvancedSettings.value = false;
+  accountForm.value = {
+    provider: 'Website',
+    channelType: 'Website',
+    displayName: '',
+    externalAccountId: '',
+    externalParentAccountId: '',
+    profileUrl: '',
+    avatarUrl: '',
+    accessToken: '',
+    refreshToken: '',
+    expiresInSeconds: null,
+    grantedScopesJson: ''
+  };
+  showAddAccountModal.value = true;
+}
+
+function openReconnectModal(acc: any) {
+  reconnectForm.value = {
+    id: acc.id,
+    displayName: acc.displayName,
+    accessToken: '',
+    refreshToken: '',
+    expiresInSeconds: null
+  };
+  showReconnectModal.value = true;
+}
+
+async function openAuditLogsModal(acc: any) {
+  selectedAccount.value = acc;
+  await connectedAccountStore.fetchAuditLogs(acc.id);
+  showAuditLogsModal.value = true;
+}
+
+async function handleAddAccount() {
+  if (!accountForm.value.displayName) {
+    toastStore.warning('Thiếu thông tin', 'Vui lòng điền Tên hiển thị.');
+    return;
+  }
+
+  // Sanitize URLs to prevent validation block
+  if (accountForm.value.profileUrl) {
+    let url = accountForm.value.profileUrl.trim();
+    if (url && !/^https?:\/\//i.test(url)) {
+      url = 'https://' + url;
+    }
+    accountForm.value.profileUrl = url;
+  }
+
+  if (accountForm.value.avatarUrl) {
+    let url = accountForm.value.avatarUrl.trim();
+    if (url && !/^https?:\/\//i.test(url)) {
+      url = 'https://' + url;
+    }
+    accountForm.value.avatarUrl = url;
+  }
+
+  // Auto-fill values for simple setup
+  if (!accountForm.value.profileUrl) {
+    if (accountForm.value.channelType === 'FacebookGroup' || accountForm.value.provider === 'Website') {
+      toastStore.warning('Thiếu thông tin', 'Vui lòng điền Đường dẫn liên kết (URL).');
+      return;
+    }
+  }
+
+  if (!accountForm.value.externalAccountId) {
+    if (accountForm.value.profileUrl) {
+      if (accountForm.value.channelType === 'FacebookGroup') {
+        const match = accountForm.value.profileUrl.match(/\/groups\/([^\/]+)/);
+        accountForm.value.externalAccountId = match ? match[1] : 'facebook-group';
+      } else {
+        try {
+          const urlObj = new URL(accountForm.value.profileUrl);
+          accountForm.value.externalAccountId = urlObj.hostname;
+        } catch {
+          accountForm.value.externalAccountId = 'site-' + Math.random().toString(36).substring(7);
+        }
+      }
+    } else {
+      accountForm.value.externalAccountId = accountForm.value.displayName.toLowerCase().replace(/\s+/g, '-');
+    }
+  }
+
+  if (!accountForm.value.accessToken) {
+    accountForm.value.accessToken = 'local-stealth-session';
+  }
+
+  try {
+    await connectedAccountStore.createAccount({
+      provider: accountForm.value.provider,
+      channelType: accountForm.value.channelType as any,
+      displayName: accountForm.value.displayName,
+      externalAccountId: accountForm.value.externalAccountId,
+      externalParentAccountId: accountForm.value.externalParentAccountId || null,
+      profileUrl: accountForm.value.profileUrl || null,
+      avatarUrl: accountForm.value.avatarUrl || null,
+      accessToken: accountForm.value.accessToken,
+      refreshToken: accountForm.value.refreshToken || null,
+      expiresInSeconds: accountForm.value.expiresInSeconds,
+      grantedScopesJson: accountForm.value.grantedScopesJson || null
+    });
+    toastStore.success('Thành công', 'Đã liên kết tài khoản thành công.');
+    showAddAccountModal.value = false;
+  } catch (error: any) {
+    toastStore.error('Lỗi', error.response?.data?.message || 'Không thể liên kết tài khoản.');
+  }
+}
+
+async function handleReconnect() {
+  if (!reconnectForm.value.accessToken) {
+    toastStore.warning('Thiếu thông tin', 'Vui lòng nhập Access Token mới.');
+    return;
+  }
+  try {
+    await connectedAccountStore.reconnectAccount(reconnectForm.value.id, {
+      accessToken: reconnectForm.value.accessToken,
+      refreshToken: reconnectForm.value.refreshToken || null,
+      expiresInSeconds: reconnectForm.value.expiresInSeconds
+    });
+    toastStore.success('Thành công', 'Đã cập nhật mã truy cập mới.');
+    showReconnectModal.value = false;
+  } catch (error: any) {
+    toastStore.error('Lỗi', error.response?.data?.message || 'Không thể làm mới kết nối.');
+  }
+}
+
+async function handleCheckHealth(id: string) {
+  try {
+    const updated = await connectedAccountStore.checkAccountHealth(id);
+    toastStore.success(
+      'Kiểm tra kết nối',
+      `Trạng thái tài khoản: ${translateStatus(updated.status)}. ${updated.lastErrorMessage || 'Kết nối hoạt động tốt.'}`
+    );
+  } catch (error: any) {
+    toastStore.error('Lỗi', error.response?.data?.message || 'Không thể kiểm tra kết nối.');
+  }
+}
+
+async function handleDeleteAccount(acc: any) {
+  if (!confirm(`Bạn có chắc chắn muốn hủy liên kết với tài khoản "${acc.displayName}" (${acc.provider})?`)) {
+    return;
+  }
+  try {
+    await connectedAccountStore.deleteAccount(acc.id);
+    toastStore.success('Thành công', 'Đã hủy liên kết tài khoản.');
+  } catch (error: any) {
+    toastStore.error('Lỗi', error.response?.data?.message || 'Không thể xóa tài khoản liên kết.');
+  }
+}
+
+function translateChannelType(type: string): string {
+  if (type === 'Website') return 'Website';
+  if (type === 'FacebookPage') return 'Trang Facebook';
+  if (type === 'FacebookGroup') return 'Nhóm Facebook';
+  if (type === 'ZaloOA') return 'Zalo OA';
+  if (type === 'TikTok') return 'TikTok';
+  if (type === 'SocialPage') return 'Trang Fanpage';
+  if (type === 'SocialGroup') return 'Nhóm Social';
+  return type;
+}
+
+function translateStatus(status: string): string {
+  if (status === 'Active') return 'Hoạt động';
+  if (status === 'Expired') return 'Hết hạn';
+  if (status === 'Revoked') return 'Bị thu hồi';
+  if (status === 'PendingSetup') return 'Chờ thiết lập';
+  if (status === 'Expiring') return 'Sắp hết hạn';
+  if (status === 'Invalid') return 'Không hợp lệ';
+  if (status === 'Disabled') return 'Đã tắt';
+  return status;
+}
+
+function providerIcon(provider: string): string {
+  const icons: Record<string, string> = {
+    'Website': '🌐',
+    'Facebook': '📘',
+    'Zalo': '💬',
+    'TikTok': '🎵',
+    'YouTube': '🎥'
+  };
+  return icons[provider] || '🔗';
+}
+
+function onProviderChange() {
+  const map: Record<string, string> = {
+    'Website': 'Website',
+    'Facebook': 'FacebookPage',
+    'Zalo': 'ZaloOA',
+    'TikTok': 'TikTok'
+  };
+  accountForm.value.channelType = map[accountForm.value.provider] || 'Website';
+}
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return 'Không có';
+  return new Date(dateStr).toLocaleString('vi-VN');
+}
+
+function isExpiringSoon(dateStr: string | null): boolean {
+  if (!dateStr) return false;
+  const exp = new Date(dateStr).getTime();
+  const now = Date.now();
+  return exp - now < 86400000 * 3; // Expiring in less than 3 days
+}
+
+async function handleTikTokOAuth() {
+  try {
+    const res = await connectedAccountService.getTikTokAuthorizeUrl();
+    if (res.data?.authorizeUrl) {
+      window.location.href = res.data.authorizeUrl;
+    } else {
+      toastStore.error('TikTok', 'Không lấy được URL OAuth. Kiểm tra cấu hình TikTok:ClientKey trong appsettings.');
+    }
+  } catch (error: any) {
+    toastStore.error('TikTok', error?.response?.data?.message || 'Không thể bắt đầu OAuth TikTok.');
   }
 }
 </script>
@@ -236,6 +506,14 @@ async function handleSaveChannels() {
         >
           <span class="icon">📢</span>
           <span>Cấu hình Kênh đăng</span>
+        </button>
+        <button 
+          class="tab-link" 
+          :class="{ active: activeTab === 'connected-accounts' }"
+          @click="activeTab = 'connected-accounts'"
+        >
+          <span class="icon">🔌</span>
+          <span>Tài khoản liên kết</span>
         </button>
       </div>
 
@@ -685,6 +963,118 @@ async function handleSaveChannels() {
             </button>
           </form>
         </div>
+
+        <!-- 6. CONNECTED ACCOUNTS SETTINGS PANEL -->
+        <div v-if="activeTab === 'connected-accounts'" class="panel-section animate-fade">
+          <div class="panel-header">
+            <div>
+              <h3>Tài khoản liên kết đăng bài (Connected Accounts)</h3>
+              <p class="subtitle">Quản lý kết nối OAuth và Tokens bảo mật của các trang mạng xã hội và Website.</p>
+            </div>
+            <div class="header-actions">
+              <button class="add-user-btn glow-yellow" @click="openAddAccountModal">
+                + Liên kết tài khoản
+              </button>
+              <button class="add-user-btn tiktok-oauth-btn" type="button" @click="handleTikTokOAuth">
+                🎵 Kết nối TikTok (OAuth)
+              </button>
+            </div>
+          </div>
+
+          <!-- Linked Accounts Grid/List -->
+          <div v-if="connectedAccountStore.loading && connectedAccountStore.accounts.length === 0" class="loading-state">
+            <span class="spinner">⏳</span> Đang tải danh sách tài khoản...
+          </div>
+          <div v-else-if="connectedAccountStore.accounts.length === 0" class="empty-state">
+            <div class="empty-icon">🔗</div>
+            <h4>Chưa có tài khoản liên kết nào</h4>
+            <p>Liên kết tài khoản Facebook, Zalo, TikTok hoặc Website của bạn để bắt đầu tự động xuất bản nội dung.</p>
+            <button class="add-user-btn glow-yellow mt-12" @click="openAddAccountModal">Liên kết ngay</button>
+          </div>
+          <div v-else class="accounts-grid">
+            <div 
+              v-for="acc in connectedAccountStore.accounts" 
+              :key="acc.id" 
+              class="account-card glass-card"
+            >
+              <div class="account-card-header">
+                <div class="account-profile">
+                  <img v-if="acc.avatarUrl" :src="acc.avatarUrl" class="account-avatar" alt="Avatar" />
+                  <div v-else class="account-avatar-placeholder" :class="acc.provider.toLowerCase()">
+                    {{ providerIcon(acc.provider) }}
+                  </div>
+                  <div class="account-details">
+                    <h4 class="account-name">{{ acc.displayName }}</h4>
+                    <span class="account-provider-tag" :class="acc.provider.toLowerCase()">
+                      {{ providerIcon(acc.provider) }} {{ acc.provider }} ({{ translateChannelType(acc.channelType) }})
+                    </span>
+                  </div>
+                </div>
+                <span class="status-badge" :class="acc.status.toLowerCase()">
+                  {{ translateStatus(acc.status) }}
+                </span>
+              </div>
+              
+              <div class="account-card-body">
+                <div class="info-item">
+                  <span class="label">ID tài khoản ngoại vi:</span>
+                  <span class="value">{{ acc.externalAccountId }}</span>
+                </div>
+                <div v-if="acc.profileUrl" class="info-item">
+                  <span class="label">Đường dẫn:</span>
+                  <a :href="acc.profileUrl" target="_blank" class="value link">{{ acc.profileUrl }}</a>
+                </div>
+                <div class="info-item">
+                  <span class="label">Cập nhật lúc:</span>
+                  <span class="value">{{ formatDate(acc.createdAt) }}</span>
+                </div>
+                <div v-if="acc.tokenExpiresAt" class="info-item">
+                  <span class="label">Hết hạn Token:</span>
+                  <span class="value expiration" :class="{ warning: isExpiringSoon(acc.tokenExpiresAt) }">
+                    {{ formatDate(acc.tokenExpiresAt) }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="account-card-actions">
+                <button 
+                  type="button" 
+                  class="action-btn health-btn" 
+                  title="Kiểm tra kết nối" 
+                  :disabled="connectedAccountStore.actionLoading"
+                  @click="handleCheckHealth(acc.id)"
+                >
+                  📡 Kiểm tra
+                </button>
+                <button 
+                  type="button" 
+                  class="action-btn reconnect-btn" 
+                  title="Cập nhật Token"
+                  @click="openReconnectModal(acc)"
+                >
+                  🔄 Kết nối lại
+                </button>
+                <button 
+                  type="button" 
+                  class="action-btn logs-btn" 
+                  title="Xem lịch sử hoạt động"
+                  @click="openAuditLogsModal(acc)"
+                >
+                  📜 Nhật ký
+                </button>
+                <button 
+                  type="button" 
+                  class="action-btn delete-btn" 
+                  title="Hủy liên kết" 
+                  :disabled="connectedAccountStore.actionLoading"
+                  @click="handleDeleteAccount(acc)"
+                >
+                  🗑️ Xóa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -718,6 +1108,209 @@ async function handleSaveChannels() {
             <button type="submit" class="btn-submit glow-yellow">Gửi lời mời</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- ADD CONNECTED ACCOUNT MODAL -->
+    <div v-if="showAddAccountModal" class="modal-overlay" @click.self="showAddAccountModal = false">
+      <div class="modal-content glass-card large animate-fade">
+        <h3>Liên kết tài khoản mạng xã hội / Website</h3>
+
+        <form class="modal-form" @submit.prevent="handleAddAccount">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nền tảng / Provider</label>
+              <select v-model="accountForm.provider" @change="onProviderChange">
+                <option value="Website">🌐 Website</option>
+                <option value="Facebook">📘 Facebook</option>
+                <option value="Zalo">💬 Zalo OA (Official Account)</option>
+                <option value="TikTok">🎵 TikTok</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Loại Kênh (Channel Type)</label>
+              <select v-model="accountForm.channelType">
+                <option v-if="accountForm.provider === 'Website'" value="Website">Website</option>
+                <option v-if="accountForm.provider === 'Facebook'" value="FacebookPage">Facebook Page</option>
+                <option v-if="accountForm.provider === 'Facebook'" value="FacebookGroup">Facebook Group</option>
+                <option v-if="accountForm.provider === 'Zalo'" value="ZaloOA">Zalo Official Account</option>
+                <option v-if="accountForm.provider === 'TikTok'" value="TikTok">TikTok</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Tên hiển thị (Display Name)</label>
+              <input v-model="accountForm.displayName" type="text" placeholder="Ví dụ: Nhóm BĐS Biên Hòa" required />
+            </div>
+
+            <div class="form-group">
+              <label>Đường dẫn trang / Nhóm / Website (URL)</label>
+              <input v-model="accountForm.profileUrl" type="text" placeholder="https://..." :required="accountForm.channelType === 'FacebookGroup' || accountForm.provider === 'Website'" />
+            </div>
+          </div>
+
+          <!-- Advanced Settings Toggle -->
+          <div class="advanced-toggle-link" @click="showAdvancedSettings = !showAdvancedSettings" style="cursor: pointer; margin: 16px 0 8px 0; color: var(--color-yellow); font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; user-select: none;">
+            <span>{{ showAdvancedSettings ? '▼' : '▶' }} ⚙️ Cấu hình nâng cao (API Tokens & IDs)</span>
+          </div>
+
+          <!-- Advanced settings container -->
+          <div v-show="showAdvancedSettings" class="advanced-settings-container animate-fade" style="border: 1px dashed var(--color-border); padding: 16px; border-radius: 8px; margin-bottom: 16px; background-color: rgba(255,255,255,0.02);">
+            <div class="form-row">
+              <div class="form-group">
+                <label>ID Tài khoản Ngoại vi (External ID - Tự động điền)</label>
+                <input v-model="accountForm.externalAccountId" type="text" placeholder="Page ID, Group ID hoặc SĐT..." />
+              </div>
+              <div class="form-group">
+                <label>ID Tài khoản cha (tùy chọn)</label>
+                <input v-model="accountForm.externalParentAccountId" type="text" placeholder="Ví dụ: App ID, Business ID..." />
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 12px;">
+              <label>Đường dẫn ảnh đại diện (Avatar URL - tùy chọn)</label>
+              <input v-model="accountForm.avatarUrl" type="text" placeholder="https://..." />
+            </div>
+
+            <div class="form-group" style="margin-top: 12px;">
+              <label>Mã truy cập (Access Token - Tự động điền)</label>
+              <input v-model="accountForm.accessToken" type="text" placeholder="Nhập Access Token bảo mật..." />
+            </div>
+
+            <div class="form-row" style="margin-top: 12px;">
+              <div class="form-group">
+                <label>Mã làm mới (Refresh Token - tùy chọn)</label>
+                <input v-model="accountForm.refreshToken" type="text" placeholder="Nhập Refresh Token nếu có..." />
+              </div>
+              <div class="form-group">
+                <label>Hết hạn sau (Giây - tùy chọn)</label>
+                <input v-model.number="accountForm.expiresInSeconds" type="number" placeholder="Ví dụ: 5184000 (60 ngày)" />
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 12px;">
+              <label>Phạm vi quyền đã cấp (Granted Scopes JSON - tùy chọn)</label>
+              <input v-model="accountForm.grantedScopesJson" type="text" placeholder='["pages_show_list", "pages_read_engagement"]' />
+            </div>
+          </div>
+
+          <!-- Zalo OA OAuth Hint -->
+          <div v-if="accountForm.provider === 'Zalo'" class="zalo-oauth-hint" style="margin-top: 12px;">
+            <div class="hint-box">
+              <h5>💬 Hướng dẫn kết nối Zalo OA</h5>
+              <ol>
+                <li>Đăng nhập <a href="https://developers.zalo.me" target="_blank">Zalo Developer</a> và tạo App.</li>
+                <li>Cấu hình Redirect URI cho ứng dụng của bạn.</li>
+                <li>Điền <strong>App ID</strong> vào ô "ID Tài khoản cha" ở trên.</li>
+                <li>Hoàn thành OAuth flow để lấy Access Token và Refresh Token.</li>
+                <li>Zalo OA Access Token hiệu lực <strong>~25 giờ</strong>, Refresh Token <strong>3 tháng</strong>.</li>
+                <li>Hệ thống sẽ tự động refresh token trước khi hết hạn.</li>
+              </ol>
+            </div>
+          </div>
+
+          <!-- TikTok OAuth Hint -->
+          <div v-if="accountForm.provider === 'TikTok'" class="tiktok-oauth-hint" style="margin-top: 12px;">
+            <div class="hint-box">
+              <h5>🎵 Hướng dẫn kết nối TikTok</h5>
+              <ol>
+                <li>Tạo app tại <a href="https://developers.tiktok.com" target="_blank">TikTok for Developers</a>.</li>
+                <li>Bật <strong>Login Kit</strong> và <strong>Content Posting API</strong> (video.upload, video.publish).</li>
+                <li>Đăng ký Redirect URI: <code>http://localhost:5000/api/v1/connectedaccounts/tiktok/callback</code></li>
+                <li>Điền <code>TikTok:ClientKey</code> và <code>TikTok:ClientSecret</code> vào appsettings.</li>
+                <li>Dùng nút <strong>Kết nối TikTok (OAuth)</strong> trên màn hình chính — không cần dán token thủ công.</li>
+              </ol>
+              <p class="audit-note" v-if="true">
+                <strong>⚠️ App chưa audit:</strong> Direct post công khai không khả dụng. Chỉ Upload/Draft (inbox TikTok) cho đến khi pass Content Posting API audit.
+              </p>
+            </div>
+          </div>
+
+
+
+          <div class="modal-actions">
+            <button type="button" class="btn-cancel" @click="showAddAccountModal = false">Hủy</button>
+            <button type="submit" class="btn-submit glow-yellow" :disabled="connectedAccountStore.actionLoading">Liên kết tài khoản</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- RECONNECT ACCOUNT MODAL -->
+    <div v-if="showReconnectModal" class="modal-overlay" @click.self="showReconnectModal = false">
+      <div class="modal-content glass-card animate-fade">
+        <h3>Làm mới liên kết: {{ reconnectForm.displayName }}</h3>
+
+        <form class="modal-form" @submit.prevent="handleReconnect">
+          <div class="form-group">
+            <label>Mã truy cập mới (Access Token)</label>
+            <input v-model="reconnectForm.accessToken" type="text" placeholder="Nhập Access Token mới..." required />
+          </div>
+
+          <div class="form-group">
+            <label>Mã làm mới mới (Refresh Token - tùy chọn)</label>
+            <input v-model="reconnectForm.refreshToken" type="text" placeholder="Nhập Refresh Token mới..." />
+          </div>
+
+          <div class="form-group">
+            <label>Hết hạn sau (Giây - tùy chọn)</label>
+            <input v-model.number="reconnectForm.expiresInSeconds" type="number" placeholder="Ví dụ: 5184000" />
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-cancel" @click="showReconnectModal = false">Hủy</button>
+            <button type="submit" class="btn-submit glow-yellow" :disabled="connectedAccountStore.actionLoading">Cập nhật kết nối</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- AUDIT LOGS MODAL -->
+    <div v-if="showAuditLogsModal" class="modal-overlay" @click.self="showAuditLogsModal = false">
+      <div class="modal-content glass-card large animate-fade">
+        <div class="panel-header">
+          <div>
+            <h3>Lịch sử hoạt động tài khoản</h3>
+            <p class="subtitle" v-if="selectedAccount">Tài khoản: {{ selectedAccount.displayName }} ({{ selectedAccount.provider }})</p>
+          </div>
+          <button type="button" class="btn-cancel" @click="showAuditLogsModal = false">Đóng</button>
+        </div>
+
+        <div v-if="connectedAccountStore.loading" class="loading-state">
+          <span>⏳</span> Đang tải lịch sử hoạt động...
+        </div>
+        <div v-else-if="connectedAccountStore.auditLogs.length === 0" class="empty-state">
+          <p>Chưa có ghi chép lịch sử hoạt động nào cho tài khoản này.</p>
+        </div>
+        <div v-else class="logs-table-container">
+          <table class="logs-table">
+            <thead>
+              <tr>
+                <th>Thời gian</th>
+                <th>Người thực hiện</th>
+                <th>Hành động</th>
+                <th>Chi tiết</th>
+                <th>IP Address</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="log in connectedAccountStore.auditLogs" :key="log.id">
+                <td>{{ formatDate(log.createdAt) }}</td>
+                <td>{{ log.userEmail || 'Hệ thống' }}</td>
+                <td>
+                  <span class="status-badge" :class="log.action.toLowerCase()">
+                    {{ log.action }}
+                  </span>
+                </td>
+                <td>{{ log.description }}</td>
+                <td>{{ log.ipAddress || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -1393,4 +1986,206 @@ input:checked + .slider:before {
   font-weight: 600;
   cursor: pointer;
 }
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tiktok-oauth-btn {
+  background: linear-gradient(135deg, #010101, #333) !important;
+}
+
+/* Connected Accounts panel styles */
+.accounts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+  margin-top: 16px;
+}
+
+.account-card {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--color-surface-glass);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.account-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--elevation-interactive);
+  border-color: var(--color-border-strong);
+}
+
+.account-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.account-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.account-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--color-border);
+}
+
+.account-avatar-placeholder {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  color: #ffffff;
+}
+
+.account-avatar-placeholder.website { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+.account-avatar-placeholder.facebook { background: linear-gradient(135deg, #1877f2, #0d4fb5); }
+.account-avatar-placeholder.zalo { background: linear-gradient(135deg, #0068ff, #004ecc); }
+.account-avatar-placeholder.tiktok { background: linear-gradient(135deg, #000000, #333333); }
+
+.account-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.account-name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.account-provider-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  color: #ffffff;
+  display: inline-block;
+  width: fit-content;
+}
+
+.account-provider-tag.website { background-color: #3b82f6; }
+.account-provider-tag.facebook { background-color: #1877f2; }
+.account-provider-tag.zalo { background-color: #0068ff; }
+.account-provider-tag.tiktok { background-color: #010101; }
+
+.status-badge.active { background-color: rgba(16, 185, 129, 0.15); color: #10b981; }
+.status-badge.expired { background-color: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.status-badge.revoked { background-color: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.status-badge.pendingsetup { background-color: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+
+.account-card-body {
+  border-top: 1px solid var(--color-divider);
+  padding-top: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.info-item .label {
+  color: var(--color-text-muted);
+}
+
+.info-item .value {
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.info-item .value.link {
+  color: var(--color-yellow);
+  text-decoration: none;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.info-item .value.expiration.warning {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.account-card-actions {
+  display: flex;
+  gap: 6px;
+  border-top: 1px solid var(--color-divider);
+  padding-top: 12px;
+}
+
+.action-btn {
+  flex: 1;
+  height: 28px;
+  border: 1px solid var(--color-border);
+  background: var(--color-canvas);
+  color: var(--color-text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-btn:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
+}
+
+.action-btn.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.loading-state,
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.empty-state h4 {
+  margin: 0 0 6px 0;
+  font-size: 15px;
+  color: var(--color-text-primary);
+}
 </style>
+

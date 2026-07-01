@@ -20,14 +20,13 @@ public static class DataSeeder
         await SeedPostingPermissionsAsync(context);
         await SeedNotificationPermissionsAsync(context);
         await SeedAdminUserAsync(context);
+        await SeedCrawlSourcesAsync(context);
 
         await context.SaveChangesAsync();
     }
 
     private static async Task SeedRolesAsync(RealSyncDbContext context)
     {
-        if (await context.Roles.AnyAsync()) return;
-
         var roles = new[]
         {
             new Role { Name = "Admin", Description = "Quản trị viên hệ thống" },
@@ -37,7 +36,14 @@ public static class DataSeeder
             new Role { Name = "Marketing", Description = "Nhân viên marketing" },
         };
 
-        context.Roles.AddRange(roles);
+        foreach (var role in roles)
+        {
+            if (!await context.Roles.AnyAsync(r => r.Name == role.Name))
+            {
+                context.Roles.Add(role);
+            }
+        }
+        await context.SaveChangesAsync();
     }
 
     private static async Task SeedPropertyTypesAsync(RealSyncDbContext context)
@@ -197,11 +203,10 @@ public static class DataSeeder
         var agentRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Agent");
         var viewerRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Viewer");
 
-        if (adminRole == null || managerRole == null || agentRole == null || viewerRole == null) return;
-
-        var users = new[]
+        var users = new List<User>();
+        if (adminRole != null)
         {
-            new User
+            users.Add(new User
             {
                 FullName = "System Admin",
                 Email = "admin@realsync.vn",
@@ -209,8 +214,8 @@ public static class DataSeeder
                 Phone = "0900000001",
                 IsActive = true,
                 RoleId = adminRole.Id,
-            },
-            new User
+            });
+            users.Add(new User
             {
                 FullName = "Cường Manager",
                 Email = "cuong@realsync.vn",
@@ -218,8 +223,8 @@ public static class DataSeeder
                 Phone = "0900000002",
                 IsActive = true,
                 RoleId = managerRole.Id,
-            },
-            new User
+            });
+            users.Add(new User
             {
                 FullName = "Lộc Agent",
                 Email = "loc@realsync.vn",
@@ -227,8 +232,11 @@ public static class DataSeeder
                 Phone = "0900000003",
                 IsActive = true,
                 RoleId = agentRole.Id,
-            },
-            new User
+            });
+        }
+        if (viewerRole != null)
+        {
+            users.Add(new User
             {
                 FullName = "Danh Viewer",
                 Email = "danh@realsync.vn",
@@ -236,8 +244,8 @@ public static class DataSeeder
                 Phone = "0900000004",
                 IsActive = true,
                 RoleId = viewerRole.Id,
-            },
-        };
+            });
+        }
 
         var seedEmails = users.Select(seedUser => seedUser.Email).ToArray();
         var existingEmails = await context.Users
@@ -357,5 +365,40 @@ public static class DataSeeder
                     context.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = permission.Id });
             }
         }
+    }
+
+    private static async Task SeedCrawlSourcesAsync(RealSyncDbContext context)
+    {
+        if (await context.CrawlSources.AnyAsync()) return;
+
+        var sources = new[]
+        {
+            new CrawlSource
+            {
+                Name = "Batdongsan.com.vn",
+                BaseUrl = "https://batdongsan.com.vn",
+                Description = "Cổng thông tin bất động sản hàng đầu Việt Nam",
+                IsActive = true,
+                CronSchedule = "0 2 * * *"
+            },
+            new CrawlSource
+            {
+                Name = "ChoTot.com",
+                BaseUrl = "https://www.chotot.com",
+                Description = "Chuyên mục Bất động sản Chợ Tốt",
+                IsActive = true,
+                CronSchedule = "0 3 * * *"
+            },
+            new CrawlSource
+            {
+                Name = "NhaDat24h.net",
+                BaseUrl = "https://nhadat24h.net",
+                Description = "Kênh thông tin quảng cáo nhà đất",
+                IsActive = true,
+                CronSchedule = "0 4 * * *"
+            }
+        };
+
+        context.CrawlSources.AddRange(sources);
     }
 }

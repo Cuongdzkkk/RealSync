@@ -16,12 +16,12 @@ function loadUser(): UserProfile | null {
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref(localStorage.getItem(storageKey));
   const user = ref<UserProfile | null>(accessToken.value
-    ? {
+    ? (loadUser() || {
         id: 'local-admin',
         fullName: 'RealSync Admin',
         email: 'admin@realsync.vn',
         role: 'Admin'
-      }
+      })
     : null);
   const loading = ref(false);
 
@@ -53,6 +53,7 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = session.user;
       localStorage.setItem(storageKey, session.accessToken);
       localStorage.setItem('realsync.refreshToken', session.refreshToken);
+      localStorage.setItem(userStorageKey, JSON.stringify(session.user));
     } finally {
       loading.value = false;
     }

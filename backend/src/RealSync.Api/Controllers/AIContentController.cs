@@ -58,4 +58,16 @@ public class AIContentController : BaseController
         var result = await _aiContentService.GetByIdAsync(postId, id);
         return OkResponse(result);
     }
+
+    /// <summary>
+    /// Áp dụng nội dung AI nháp vào bài đăng (Content Apply Flow).
+    /// </summary>
+    [HttpPost("apply")]
+    [RequirePermission("posts.update")]
+    [ProducesResponseType(typeof(Shared.DTOs.Responses.ApiResponse<object>), 200)]
+    public async Task<IActionResult> Apply(Guid postId, [FromBody] ApplyAIContentRequest request)
+    {
+        await _aiContentService.ApplyAsync(postId, request);
+        return OkResponse<object>(null, "Nội dung bài đăng đã được cập nhật thành công.");
+    }
 }

@@ -4,17 +4,35 @@ import { usePropertyStore } from '@/stores/usePropertyStore';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { usePostStore } from '@/stores/usePostStore';
+import { usePublicationStore } from '@/stores/usePublicationStore';
 import RoleGate from '@/components/common/RoleGate.vue';
+import VideoStudioPanel from '@/components/content-ai/VideoStudioPanel.vue';
+import TikTokPublishPanel from '@/components/content-ai/TikTokPublishPanel.vue';
 import { postingService } from '@/services/postingService';
 import { api } from '@/services/api';
+import { useVideoStore } from '@/stores/useVideoStore';
+import { useConnectedAccountStore } from '@/stores/useConnectedAccountStore';
 
 const propertyStore = usePropertyStore();
 const projectStore = useProjectStore();
 const toastStore = useToastStore();
 const postStore = usePostStore();
+const publicationStore = usePublicationStore();
+const videoStore = useVideoStore();
+const connectedAccountStore = useConnectedAccountStore();
+
+// --- Active Tab State ---
+const activeTab = ref<'compose' | 'monitor' | 'video'>('compose');
 
 onMounted(async () => {
   postStore.fetchAllHistory();
+  fetchMonitorJobs();
+  connectedAccountStore.fetchAccounts();
+  propertyStore.fetchProperties().then(() => {
+    if (propertyStore.items.length > 0 && selectedType.value === 'property') {
+      selectedPropertyId.value = propertyStore.items[0].id;
+    }
+  });
   try {
     const { data: res } = await api.get('/settings/channels');
     if (res.data && res.data.facebookGroupIds) {
@@ -29,7 +47,7 @@ onMounted(async () => {
 const selectedType = ref<'property' | 'project'>('property');
 const selectedPropertyId = ref(propertyStore.items[0]?.id || '');
 const selectedProjectId = ref(projectStore.items[0]?.id || '');
-const selectedChannel = ref<'facebook' | 'listing' | 'zalo' | 'seo' | 'batdongsan' | 'chotot' | 'alonhadat'>('facebook');
+const selectedChannel = ref<'facebook' | 'listing' | 'zalo' | 'tiktok' | 'seo' | 'batdongsan' | 'chotot' | 'alonhadat' | 'website'>('facebook');
 const selectedTone = ref<string>('persuasive');
 const includeEmojis = ref(true);
 const includeContact = ref(true);
@@ -42,6 +60,162 @@ const isGenerating = ref(false);
 const generatedText = ref('');
 const displayedText = ref(''); // For typing animation
 const showPreview = ref(false);
+const currentAiGeneration = ref<any>(null);
+const isApplying = ref(false);
+
+const aiUsageStats = computed(() => {
+  if (!currentAiGeneration.value) return null;
+  return {
+    promptTokens: currentAiGeneration.value.promptTokens,
+    completionTokens: currentAiGeneration.value.completionTokens,
+    estimatedCost: currentAiGeneration.value.estimatedCost
+  };
+});
+
+const tiktokVideoUrl = computed(() => {
+  const url = videoStore.currentProject?.finalAsset?.url;
+  if (!url) return undefined;
+  if (url.startsWith('http')) return url;
+  return `http://localhost:5000${url.startsWith('/') ? url : '/' + url}`;
+});
+
+const isAiGeneratedContent = computed(() => !!currentAiGeneration.value);
+
+const factsChecklist = computed(() => {
+  if (!currentAiGeneration.value || !currentAiGeneration.value.factsUsedJson) return [];
+  try {
+    const parsed = JSON.parse(currentAiGeneration.value.factsUsedJson);
+    return parsed.factsUsed || [];
+  } catch (e) {
+    console.error("Failed to parse factsUsedJson", e);
+    return [];
+  }
+});
+
+const contradictionWarnings = computed(() => {
+  if (!currentAiGeneration.value || !currentAiGeneration.value.factsUsedJson) return [];
+  try {
+    const parsed = JSON.parse(currentAiGeneration.value.factsUsedJson);
+    return parsed.warnings || [];
+  } catch (e) {
+    console.error("Failed to parse warnings from factsUsedJson", e);
+    return [];
+  }
+});
+
+// --- Monitor States ---
+const monitorPage = ref(1);
+const monitorPageSize = ref(10);
+const monitorStatusFilter = ref<string>('');
+const selectedJobId = ref<string | null>(null);
+const queuePostId = ref('');
+const queueConnectedAccountId = ref('');
+const queuePublishMode = ref<'Direct' | 'DraftUpload' | 'Assisted'>('Direct');
+const queueMediaUrl = ref('');
+
+const activeConnectedAccounts = computed(() =>
+  connectedAccountStore.accounts.filter(a => a.status === 'Active')
+);
+
+const selectedQueueAccount = computed(() =>
+  connectedAccountStore.accounts.find(a => a.id === queueConnectedAccountId.value)
+);
+
+const tikTokPanelPostId = computed(() => postStore.currentPost?.id || historyList.value[0]?.id || '');
+const tikTokPanelCaption = computed(() => postStore.currentPost?.content || displayedText.value || '');
+
+async function fetchMonitorJobs() {
+  await publicationStore.fetchJobs({
+    status: monitorStatusFilter.value || undefined,
+    page: monitorPage.value,
+    pageSize: monitorPageSize.value
+  });
+}
+
+async function handleQueuePublicationTest() {
+  if (!queuePostId.value) {
+    toastStore.warning('Publishing', 'Choose a post first.');
+    return;
+  }
+
+  const mediaManifestJson = queueMediaUrl.value.trim()
+    ? JSON.stringify({
+        videoUrl: queueMediaUrl.value.trim(),
+        isAigc: true,
+        privacyLevel: 'SELF_ONLY',
+        userConsentConfirmed: true
+      })
+    : null;
+
+  try {
+    await publicationStore.queueJob({
+      postId: queuePostId.value,
+      contentVariantId: '00000000-0000-0000-0000-000000000000',
+      connectedAccountId: queueConnectedAccountId.value || null,
+      publishMode: queuePublishMode.value,
+      scheduledAtUtc: null,
+      mediaManifestJson
+    });
+    toastStore.success('Publishing', 'Queued publishing job for test.');
+    await fetchMonitorJobs();
+  } catch (error: any) {
+    toastStore.error('Publishing', error?.response?.data?.message || 'Cannot queue publishing job.');
+  }
+}
+
+async function handleSelectJob(id: string) {
+  selectedJobId.value = id;
+  await publicationStore.fetchAttempts(id);
+}
+
+async function handleRefreshJob(id: string) {
+  try {
+    await publicationStore.refreshStatus(id);
+    toastStore.success('Publishing', 'Refreshed provider status.');
+  } catch (error: any) {
+    toastStore.error('Publishing', error?.response?.data?.message || 'Cannot refresh provider status.');
+  }
+}
+
+async function handleRetryJob(id: string) {
+  try {
+    await publicationStore.retryJob(id);
+    toastStore.success('Publishing', 'Retry job queued.');
+  } catch (error: any) {
+    toastStore.error('Publishing', error?.response?.data?.message || 'Cannot retry this job.');
+  }
+}
+
+async function handleCancelJob(id: string) {
+  try {
+    await publicationStore.cancelJob(id);
+    toastStore.success('Publishing', 'Job cancelled.');
+  } catch (error: any) {
+    toastStore.error('Publishing', error?.response?.data?.message || 'Cannot cancel this job.');
+  }
+}
+
+function accountDisplayName(id: string | null) {
+  if (!id) return 'Website';
+  const account = connectedAccountStore.accounts.find(a => a.id === id);
+  return account ? `${account.provider} - ${account.displayName}` : id.slice(0, 8);
+}
+
+function shortId(id: string) {
+  return id.slice(0, 8);
+}
+
+function isRetryableStatus(status: string) {
+  return status === 'Failed' || status === 'NeedsReview';
+}
+
+function isCancellableStatus(status: string) {
+  return status !== 'Published' && status !== 'Cancelled';
+}
+
+watch([monitorStatusFilter, monitorPage], () => {
+  fetchMonitorJobs();
+});
 
 const selectedTargetItem = computed(() => {
   if (selectedType.value === 'property') {
@@ -97,8 +271,26 @@ async function triggerGeneration() {
   const itemId = item.id;
   const channel = selectedChannel.value;
 
-  // Xây dựng prompt dựa trên channel + tone
-  const prompt = `Viết nội dung ${channel === 'facebook' ? 'Facebook Post' : channel === 'zalo' ? 'Zalo Broadcast' : channel === 'seo' ? 'bài viết SEO' : 'tin đăng BĐS'} cho "${itemName}", giọng văn ${selectedTone.value}, ${includeEmojis.value ? 'có emoji' : 'không emoji'}${includeContact.value ? ', kèm thông tin liên hệ' : ''}`;
+  // Xây dựng hướng dẫn chi tiết theo loại hình kênh (Platform Template)
+  let platformContext = "";
+  if (channel === 'facebook') {
+    platformContext = "định dạng bài viết mạng xã hội Facebook hấp dẫn, có chia nhóm ý chính, câu hook gây ấn tượng ở đầu bài, hashtag ở cuối.";
+  } else if (channel === 'zalo') {
+    platformContext = "định dạng Zalo broadcast ngắn gọn, tập trung thẳng vào thông tin nổi bật nhất, nút call to action rõ ràng.";
+  } else if (channel === 'seo') {
+    platformContext = "bài viết chuẩn SEO chuyên sâu, phân tích tiềm năng bất động sản, cấu trúc heading rõ ràng, nhiều từ khóa liên quan.";
+  } else if (channel === 'batdongsan' || channel === 'chotot' || channel === 'alonhadat') {
+    platformContext = `tin đăng đặc thù cho sàn thương mại điện tử ${channel.toUpperCase()}, mô tả chi tiết thông số kỹ thuật (vị trí, diện tích, giá bán, pháp lý), thông tin minh bạch, chuyên nghiệp.`;
+  } else {
+    platformContext = "tin đăng BĐS tiêu chuẩn đầy đủ thông tin vị trí, diện tích, mức giá, tiện ích xung quanh.";
+  }
+
+  const prompt = `Hãy viết một bài đăng hoàn chỉnh cho ${channel.toUpperCase()} về bất động sản "${itemName}".
+Yêu cầu định dạng: ${platformContext}
+Giọng văn: ${selectedTone.value}
+Kèm emoji: ${includeEmojis.value ? 'Có' : 'Không'}
+Thông tin liên hệ môi giới: ${includeContact.value ? 'Có kèm' : 'Không kèm'}
+`;
 
   try {
     // Gọi API: tạo Post → sinh AI content
@@ -106,6 +298,7 @@ async function triggerGeneration() {
 
     // Hiển thị nội dung AI trả về với hiệu ứng typing
     generatedText.value = generation.generatedContent;
+    currentAiGeneration.value = generation;
 
     setTimeout(() => {
       isGenerating.value = false;
@@ -132,7 +325,25 @@ function copyContent() {
   toastStore.success('Đã sao chép', 'Nội dung đã được sao chép vào bộ nhớ tạm.');
 }
 
+async function saveCurrentContent() {
+  if (!postStore.currentPost) {
+    toastStore.warning('Cảnh báo', 'Không tìm thấy bài đăng hoạt động để lưu.');
+    return;
+  }
+  isApplying.value = true;
+  try {
+    await postStore.applyAiContent(postStore.currentPost.id, displayedText.value);
+    toastStore.success('Đã lưu thành công', 'Nội dung bài viết đã được cập nhật vào cơ sở dữ liệu.');
+  } catch (error: any) {
+    toastStore.error('Lỗi', error?.response?.data?.message || 'Không thể lưu nội dung bài viết.');
+  } finally {
+    isApplying.value = false;
+  }
+}
+
 // History: lấy từ API posts thay vì mock
+const selectedFilterChannel = ref('all');
+
 const historyList = computed(() =>
   postStore.posts.map(p => ({
     id: p.id,
@@ -144,7 +355,15 @@ const historyList = computed(() =>
   }))
 );
 
-function extractChannel(summary?: string): 'seo' | 'facebook' | 'zalo' | 'listing' | 'batdongsan' | 'chotot' | 'alonhadat' {
+const filteredHistoryList = computed(() => {
+  const list = historyList.value;
+  if (selectedFilterChannel.value === 'all') {
+    return list;
+  }
+  return list.filter(item => item.channel === selectedFilterChannel.value);
+});
+
+function extractChannel(summary?: string): 'seo' | 'facebook' | 'zalo' | 'listing' | 'batdongsan' | 'chotot' | 'alonhadat' | 'website' {
   if (!summary) return 'listing';
   const sum = summary.toLowerCase();
   if (sum.includes('facebook')) return 'facebook';
@@ -153,6 +372,7 @@ function extractChannel(summary?: string): 'seo' | 'facebook' | 'zalo' | 'listin
   if (sum.includes('batdongsan')) return 'batdongsan';
   if (sum.includes('chotot')) return 'chotot';
   if (sum.includes('alonhadat')) return 'alonhadat';
+  if (sum.includes('website')) return 'website';
   return 'listing';
 }
 
@@ -222,6 +442,13 @@ async function publishCurrentPost() {
   isPublishing.value = true;
   const channelName = selectedChannel.value;
   const postId = postStore.currentPost.id;
+
+  // Auto-save the edited text back to the database before publishing
+  try {
+    await postStore.applyAiContent(postId, displayedText.value);
+  } catch (err) {
+    console.warn("Failed to auto-save post content before publishing:", err);
+  }
 
   // Tự động copy nội dung cho Facebook và Zalo trước khi chạy API
   if (channelName.toLowerCase() === 'facebook' || channelName.toLowerCase() === 'zalo') {
@@ -294,6 +521,28 @@ async function publishCurrentPost() {
 }
 
 async function publishHistoryPost(postId: string, channelName: string) {
+  // Nß║╛U L├Ç K├èNH WEBSITE -> Gß╗îI PUBLISHING ORCHESTRATOR
+  if (channelName.toLowerCase() === 'website') {
+    try {
+      await publicationStore.queueJob({
+        postId: postId,
+        contentVariantId: '00000000-0000-0000-0000-000000000000',
+        connectedAccountId: null,
+        publishMode: 'Direct',
+        scheduledAtUtc: null
+      });
+      toastStore.success('─É─âng b├ái th├ánh c├┤ng', 'Y├¬u cß║ºu xuß║Ñt bß║ún l├¬n Website ─æ├ú ─æ╞░ß╗úc ─æ╞░a v├áo h├áng ─æß╗úi xß╗¡ l├╜ ngß║ºm (Hangfire).');
+      
+      const showcaseUrl = `http://localhost:5000/api/v1/posts/${postId}/public`;
+      window.open(showcaseUrl, '_blank');
+      
+      postStore.fetchAllHistory();
+    } catch (error: any) {
+      toastStore.error('Lß╗ùi ─æ─âng b├ái', error?.response?.data?.message || 'Kh├┤ng thß╗â tß║ío job xuß║Ñt bß║ún l├¬n Website.');
+    }
+    return;
+  }
+
   const post = postStore.posts.find(p => p.id === postId);
   const content = post?.content || '';
 
@@ -368,6 +617,27 @@ async function publishHistoryPost(postId: string, channelName: string) {
 <template>
   <RoleGate :roles="['Admin', 'Sales', 'Marketing']">
     <div class="page">
+      <div class="tabs-navigation glass-card">
+        <button
+          type="button"
+          class="nav-tab-btn"
+          :class="{ active: activeTab === 'compose' }"
+          @click="activeTab = 'compose'"
+        >
+          Compose
+        </button>
+        <button
+          type="button"
+          class="nav-tab-btn"
+          :class="{ active: activeTab === 'monitor' }"
+          @click="activeTab = 'monitor'; fetchMonitorJobs()"
+        >
+          Publishing Monitor
+        </button>
+        <!-- Video tab hidden -->
+      </div>
+
+      <div v-if="activeTab === 'compose'">
       <div class="workspace-grid">
       <!-- Left Controls Panel -->
       <div class="panel-controls glass-card">
@@ -562,6 +832,9 @@ async function publishHistoryPost(postId: string, channelName: string) {
             <span class="mockup-tag">{{ selectedChannel.toUpperCase() }} MOCKUP</span>
             <div style="display: flex; gap: 8px;">
               <button class="copy-btn glow-yellow" @click="copyContent">Sao chép nội dung</button>
+              <button class="copy-btn" :disabled="isApplying" style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.15);" @click="saveCurrentContent">
+                {{ isApplying ? 'Đang lưu...' : '💾 Lưu nội dung' }}
+              </button>
               <button class="publish-btn" :disabled="isPublishing" @click="publishCurrentPost">
                 <span v-if="isPublishing" class="spinner-inline"></span>
                 {{ isPublishing ? 'Đang đăng...' : 'Đăng bài (Publish)' }}
@@ -680,9 +953,27 @@ async function publishHistoryPost(postId: string, channelName: string) {
 
     <!-- History list table -->
     <div class="history-section glass-card">
-      <div class="section-header">
-        <h3>Lịch sử nội dung tiếp thị đã xuất bản</h3>
-        <p class="subtitle">Danh sách các mô tả tin đăng và bài social được tạo trước đó.</p>
+      <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
+        <div>
+          <h3>📜 Lịch sử nội dung tiếp thị đã soạn thảo</h3>
+          <p class="subtitle">Danh sách các mô tả tin đăng và bài viết đã tạo trước đó.</p>
+        </div>
+        
+        <!-- Filter dropdown -->
+        <div class="filter-channel-dropdown" style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 12px; font-weight: 600; color: var(--color-text-secondary);">Lọc theo kênh:</span>
+          <select v-model="selectedFilterChannel" style="height: 32px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-canvas); color: var(--color-text-primary); font-size: 12px;">
+            <option value="all">Tất cả các kênh</option>
+            <option value="facebook">Facebook</option>
+            <option value="zalo">Zalo</option>
+            <option value="seo">SEO</option>
+            <option value="batdongsan">Batdongsan.com.vn</option>
+            <option value="chotot">Chợ Tốt</option>
+            <option value="alonhadat">Alo Nhà Đất</option>
+            <option value="website">Website</option>
+            <option value="listing">Tin đăng khác</option>
+          </select>
+        </div>
       </div>
 
       <table class="history-table">
@@ -697,7 +988,7 @@ async function publishHistoryPost(postId: string, channelName: string) {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in historyList" :key="item.id">
+          <tr v-for="item in filteredHistoryList" :key="item.id">
             <td class="item-title">{{ item.title }}</td>
             <td>
               <span class="channel-tag" :class="item.channel">
@@ -731,21 +1022,210 @@ async function publishHistoryPost(postId: string, channelName: string) {
     </div>
 
     <!-- MODAL ĐĂNG NHÓM FACEBOOK -->
+    </div>
+
+    <div v-if="activeTab === 'monitor'" class="monitor-panel animate-fade">
+      <div class="monitor-controls glass-card">
+        <div class="section-header">
+          <h3>Publishing Monitor</h3>
+          <p class="subtitle">Queue a test job, refresh provider status, retry failed jobs, or cancel pending work.</p>
+        </div>
+
+        <div class="filter-bar">
+          <div class="filter-group">
+            <label>Status</label>
+            <select v-model="monitorStatusFilter" class="filter-select">
+              <option value="">All statuses</option>
+              <option value="Pending">Pending</option>
+              <option value="Queued">Queued</option>
+              <option value="Validating">Validating</option>
+              <option value="Publishing">Publishing</option>
+              <option value="RemoteProcessing">Remote Processing</option>
+              <option value="NeedsReview">Needs Review</option>
+              <option value="RetryScheduled">Retry Scheduled</option>
+              <option value="Failed">Failed</option>
+              <option value="Published">Published</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </div>
+          <button type="button" class="refresh-btn" :disabled="publicationStore.loading" @click="fetchMonitorJobs">
+            Refresh jobs
+          </button>
+        </div>
+
+        <form class="queue-test-form" @submit.prevent="handleQueuePublicationTest">
+          <div class="form-group">
+            <label>Post</label>
+            <select v-model="queuePostId">
+              <option value="">Choose a post</option>
+              <option v-for="item in filteredHistoryList" :key="item.id" :value="item.id">
+                {{ item.title }}
+              </option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Connected account</label>
+            <select v-model="queueConnectedAccountId">
+              <option value="">Website / no account</option>
+              <option v-for="account in activeConnectedAccounts" :key="account.id" :value="account.id">
+                {{ account.provider }} - {{ account.displayName }}
+              </option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Mode</label>
+            <select v-model="queuePublishMode">
+              <option value="Direct">Direct</option>
+              <option value="DraftUpload">Draft Upload</option>
+              <option value="Assisted">Assisted</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Video URL (optional)</label>
+            <input v-model="queueMediaUrl" type="url" placeholder="https://..." />
+          </div>
+          <button type="submit" class="refresh-btn" :disabled="publicationStore.actionLoading">
+            Queue test job
+          </button>
+          <p v-if="selectedQueueAccount" class="subtitle">
+            Target: {{ selectedQueueAccount.provider }} / {{ selectedQueueAccount.channelType }}
+          </p>
+        </form>
+
+        <table class="monitor-table">
+          <thead>
+            <tr>
+              <th>Job</th>
+              <th>Target</th>
+              <th>Mode</th>
+              <th>Status</th>
+              <th>Published</th>
+              <th>Error</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="publicationStore.jobs.length === 0">
+              <td colspan="7" class="no-data">No publishing jobs yet.</td>
+            </tr>
+            <tr
+              v-for="job in publicationStore.jobs"
+              :key="job.id"
+              class="clickable-row"
+              :class="{ selected: selectedJobId === job.id }"
+              @click="handleSelectJob(job.id)"
+            >
+              <td class="job-id-cell"><code>{{ shortId(job.id) }}</code></td>
+              <td>{{ accountDisplayName(job.connectedAccountId) }}</td>
+              <td><span class="mode-tag" :class="(job.publishMode ?? '').toString().toLowerCase()">{{ job.publishMode }}</span></td>
+              <td><span class="status-lbl" :class="(job.status ?? '').toString().toLowerCase()">{{ job.status }}</span></td>
+              <td>
+                <a v-if="job.publishedUrl" :href="job.publishedUrl" target="_blank" class="showcase-link">Open</a>
+                <span v-else>-</span>
+              </td>
+              <td class="error-cell">{{ job.lastErrorMessage || '-' }}</td>
+              <td>
+                <div class="job-actions" @click.stop>
+                  <button type="button" class="action-btn-copy" @click="handleRefreshJob(job.id)">Status</button>
+                  <button
+                    v-if="isRetryableStatus(job.status)"
+                    type="button"
+                    class="action-btn-retry"
+                    @click="handleRetryJob(job.id)"
+                  >
+                    Retry
+                  </button>
+                  <button
+                    v-if="isCancellableStatus(job.status)"
+                    type="button"
+                    class="action-btn-delete"
+                    @click="handleCancelJob(job.id)"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="pagination">
+          <button type="button" class="page-btn" :disabled="monitorPage <= 1" @click="monitorPage--">Prev</button>
+          <span>Page {{ monitorPage }}</span>
+          <button
+            type="button"
+            class="page-btn"
+            :disabled="publicationStore.jobs.length < monitorPageSize"
+            @click="monitorPage++"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+
+      <div v-if="selectedJobId" class="job-details-panel glass-card">
+        <div class="section-header">
+          <h3>Attempts for {{ shortId(selectedJobId) }}</h3>
+        </div>
+        <table class="attempts-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Success</th>
+              <th>HTTP</th>
+              <th>Category</th>
+              <th>Request ID</th>
+              <th>Retry</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="publicationStore.attempts.length === 0">
+              <td colspan="6" class="no-data">No attempts recorded.</td>
+            </tr>
+            <tr v-for="attempt in publicationStore.attempts" :key="attempt.id">
+              <td>{{ attempt.attemptNumber }}</td>
+              <td>{{ attempt.isSuccess ? 'Yes' : 'No' }}</td>
+              <td>{{ attempt.providerHttpStatus || '-' }}</td>
+              <td>{{ attempt.normalizedErrorCategory || '-' }}</td>
+              <td><code>{{ attempt.providerRequestId || '-' }}</code></td>
+              <td>{{ attempt.retryDecision || '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div v-if="activeTab === 'video'" class="video-publish-grid animate-fade">
+      <VideoStudioPanel />
+      <TikTokPublishPanel
+        :post-id="tikTokPanelPostId"
+        :caption="tikTokPanelCaption"
+        :video-url="tiktokVideoUrl"
+        :is-aigc="isAiGeneratedContent"
+      />
+    </div>
+
     <div v-if="showGroupModal" class="modal-overlay" @click.self="showGroupModal = false">
       <div class="modal-content glass-card animate-fade">
-        <h3>📢 Đăng bài lên nhóm Facebook</h3>
-        <p class="modal-desc">Nội dung bài viết đã được sao chép vào bộ nhớ tạm (Clipboard). Hãy bấm vào từng nhóm dưới đây để dán (Ctrl+V) và đăng bài:</p>
-        
+        <h3>📣 Đăng bài lên nhóm Facebook</h3>
+        <p class="modal-desc">Nội dung đã được sao chép vào Clipboard. Bấm vào mỗi nhóm để mở Facebook và dán nội dung (Ctrl+V):</p>
+
+        <!-- Auto-fill preview -->
+        <div v-if="displayedText" class="autofill-preview">
+          <div class="autofill-label">📝 Nội dung sẽ đăng:</div>
+          <div class="autofill-text">{{ displayedText.substring(0, 200) }}{{ displayedText.length > 200 ? '...' : '' }}</div>
+        </div>
+
         <div class="group-links-list">
-          <a 
-            v-for="(groupId, index) in activeGroups" 
-            :key="groupId" 
-            :href="'https://www.facebook.com/groups/' + groupId" 
-            target="_blank" 
+          <a
+            v-for="(groupId, index) in activeGroups"
+            :key="groupId"
+            :href="'https://www.facebook.com/groups/' + groupId"
+            target="_blank"
             class="group-link-item"
-            @click="toastStore.success('Đã mở nhóm', 'Hãy nhấn Ctrl+V để đăng bài.')"
+            @click="toastStore.success('Đã mở nhóm', 'Hãy nhấn Ctrl+V để dán và đăng bài.')"
           >
-            👥 Mở nhóm {{ index + 1 }} (ID: {{ groupId }})
+            🔗 Nhóm {{ index + 1 }} — ID: {{ groupId }}
           </a>
         </div>
 
@@ -754,7 +1234,7 @@ async function publishHistoryPost(postId: string, channelName: string) {
         </div>
       </div>
     </div>
-  </div>
+    </div>
   </RoleGate>
 </template>
 
@@ -1517,12 +1997,14 @@ async function publishHistoryPost(postId: string, channelName: string) {
 .channel-tag.batdongsan { background-color: rgba(0, 90, 60, 0.15); color: #005a3c; }
 .channel-tag.chotot { background-color: rgba(255, 186, 0, 0.15); color: #d97706; }
 .channel-tag.alonhadat { background-color: rgba(0, 118, 163, 0.15); color: #0076a3; }
+.channel-tag.website { background-color: rgba(251, 191, 36, 0.15); color: var(--color-yellow); }
 
 .status-lbl {
   font-size: 9px;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 4px;
+  text-transform: uppercase;
 }
 .status-lbl.draft { background-color: rgba(148, 163, 184, 0.15); color: #94a3b8; }
 .status-lbl.review { background-color: rgba(245, 158, 11, 0.15); color: #f59e0b; }
@@ -1648,4 +2130,413 @@ async function publishHistoryPost(postId: string, channelName: string) {
   color: #ffffff;
   border-color: #ef4444;
 }
+
+/* Navigation Tabs styles */
+.tabs-navigation {
+  display: flex;
+  gap: 12px;
+  padding: 12px 20px;
+  margin-bottom: 24px;
+  border-radius: 12px;
+}
+
+.nav-tab-btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+
+.nav-tab-btn:hover {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.nav-tab-btn.active {
+  background-color: var(--color-yellow);
+  color: var(--color-yellow-text);
+  border-color: var(--color-yellow);
+  box-shadow: var(--color-yellow-glow);
+}
+
+/* Monitor Panel styles */
+.monitor-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.monitor-controls {
+  padding: 24px;
+}
+
+.filter-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filter-group label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.filter-select {
+  height: 38px;
+  width: 240px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-canvas);
+  border-radius: 8px;
+  padding: 0 12px;
+  font-size: 12.5px;
+  color: var(--color-text-primary);
+}
+
+.refresh-btn {
+  height: 38px;
+  border: none;
+  background-color: var(--color-yellow);
+  color: var(--color-yellow-text);
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all var(--duration-fast);
+}
+
+.refresh-btn:hover {
+  background-color: var(--color-yellow-hover);
+}
+
+.monitor-table, .attempts-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 12px;
+}
+
+.monitor-table th, .attempts-table th {
+  padding: 12px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.monitor-table td, .attempts-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-divider);
+  color: var(--color-text-secondary);
+}
+
+.clickable-row {
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+
+.clickable-row:hover {
+  background-color: var(--color-surface-hover);
+}
+
+.clickable-row.selected {
+  background-color: rgba(251, 191, 36, 0.08);
+}
+
+.job-id-cell code, .attempts-table code {
+  background-color: var(--color-divider);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.mode-tag {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.mode-tag.direct { background-color: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.mode-tag.scheduled { background-color: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.mode-tag.draftupload { background-color: rgba(168, 85, 247, 0.15); color: #a855f7; }
+.mode-tag.assisted { background-color: rgba(16, 185, 129, 0.15); color: #10b981; }
+
+.status-lbl.pending { background-color: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+.status-lbl.queued { background-color: rgba(148, 163, 184, 0.25); color: #94a3b8; }
+.status-lbl.validating { background-color: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.status-lbl.needsreview { background-color: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.status-lbl.publishing { background-color: rgba(168, 85, 247, 0.15); color: #a855f7; }
+.status-lbl.published { background-color: rgba(16, 185, 129, 0.15); color: #10b981; }
+.status-lbl.failed { background-color: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.status-lbl.retryscheduled { background-color: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.status-lbl.cancelled { background-color: rgba(100, 116, 139, 0.15); color: #64748b; }
+
+.showcase-link {
+  color: var(--color-yellow);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.showcase-link:hover {
+  text-decoration: underline;
+}
+
+.error-cell {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #ef4444 !important;
+}
+
+.action-btn-retry {
+  background: var(--color-ai-bg);
+  border: 1px solid var(--color-ai-border);
+  color: var(--color-ai);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+
+.action-btn-retry:hover {
+  background-color: var(--color-ai);
+  color: #ffffff;
+}
+
+.no-data {
+  text-align: center;
+  padding: 24px;
+  color: var(--color-text-muted);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.page-btn {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-secondary);
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.job-details-panel {
+  padding: 24px;
+}
+
+.queue-test-form {
+  display: grid;
+  grid-template-columns: 1.3fr 1.2fr 0.8fr 1.2fr auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 20px;
+}
+
+.queue-test-form input,
+.queue-test-form select {
+  height: 38px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-canvas);
+  border-radius: 8px;
+  padding: 0 12px;
+  font-size: 12.5px;
+  color: var(--color-text-primary);
+}
+
+.job-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.video-publish-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+  gap: 24px;
+}
+
+/* AI Diagnostics & Fact Grounding Panels */
+.ai-diagnostics-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.contradiction-alert {
+  background-color: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: left;
+}
+
+.contradiction-alert .alert-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ef4444;
+  margin-bottom: 8px;
+}
+
+.contradiction-alert .alert-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.facts-grounding-card {
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-glass);
+  text-align: left;
+}
+
+.facts-grounding-card .card-header-icon {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--color-text-primary);
+}
+
+.facts-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fact-item-badge {
+  background: var(--color-divider);
+  border: 1px solid var(--color-border);
+  padding: 6px 12px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.fact-field {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.fact-value {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.no-facts-text {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.usage-stats-card {
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-glass);
+  text-align: left;
+}
+
+.usage-stats-card .card-header-icon {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--color-text-primary);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+.stat-box {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-lbl {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.stat-val {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.text-green {
+  color: #10b981 !important;
+}
+
+.apply-btn {
+  background-color: var(--color-yellow);
+  color: var(--color-yellow-text);
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all var(--duration-fast);
+}
+
+.apply-btn:hover {
+  background-color: var(--color-yellow-hover);
+}
+
+.apply-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 </style>
+

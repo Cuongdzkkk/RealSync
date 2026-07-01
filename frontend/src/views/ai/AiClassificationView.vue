@@ -1,11 +1,11 @@
-<script setup lang="ts">
-import { computed, ref } from 'vue';
+﻿<script setup lang="ts">
+import { computed, ref, onMounted } from 'vue';
 import { useLeadStore } from '@/stores/useLeadStore';
 import { usePropertyStore } from '@/stores/usePropertyStore';
 import { useToastStore } from '@/stores/useToastStore';
-import { mockAiJobs } from '@/utils/mockData';
 import { formatCurrency } from '@/utils/format';
 import RoleGate from '@/components/common/RoleGate.vue';
+import { api } from '@/services/api';
 
 const leadStore = useLeadStore();
 const propertyStore = usePropertyStore();
@@ -18,9 +18,9 @@ const showAnalysisResults = ref(false);
 
 // AI Extraction results model
 const extractedEntities = ref({
-  intent: 'Mua bán Bất động sản',
+  intent: 'Tìm mua Bất động sản',
   area: 'Quận 7, TP.HCM',
-  budget: 'Từ 8 - 14 tỷ VNĐ',
+  budget: 'Từ 8 - 14 tỷ VND',
   type: 'Căn hộ chung cư / Nhà phố',
   bedrooms: '3 Phòng ngủ',
   urgency: 'Cao (Hot Lead)',
@@ -38,8 +38,12 @@ const templates = [
     text: 'Cần mua nhà phố kinh doanh mặt tiền hoặc hẻm xe hơi lớn tại Bình Thạnh, ngân sách tối đa 30 tỷ, hướng Đông Nam tốt cho kinh doanh.'
   },
   {
-    label: 'Đất nền giá tốt Bình Chánh',
-    text: 'Tìm đất nền thổ cư khu vực Bình Chánh dưới 5 tỷ, pháp lý sổ hồng riêng rõ ràng, sang tên công chứng ngay trong tuần.'
+    label: 'Đất nền giá tốt Vĩnh Cửu',
+    text: 'Tìm đất nền thổ cư khu vực Vĩnh Cửu, Đồng Nai dưới 5 tỷ, pháp lý sổ hồng riêng rõ ràng, sang tên công chứng ngay trong tuần.'
+  },
+  {
+    label: 'Căn hộ cho thuê Thủ Đức',
+    text: 'Cần thuê căn hộ 2 phòng ngủ tại TP. Thủ Đức, giá từ 8-12 triệu/tháng, gần đại học, đầy đủ nội thất, hầm xe.'
   }
 ];
 
@@ -47,22 +51,43 @@ function applyTemplate(text: string) {
   inputText.value = text;
 }
 
-// Matching properties calculation based on simulated NLP intent
+// Normalize Vietnamese text for comparison (remove diacritics for fuzzy match)
+function normalizeVietnamese(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9\s]/g, '');
+}
+
+// Matching properties calculation based on NLP intent
 const matchedProperties = computed(() => {
   if (!showAnalysisResults.value) return [];
-  
-  // Return some matching properties from propertyStore
-  if (inputText.value.includes('Quận 7')) {
-    return propertyStore.items.filter(p => p.address.includes('Quận 7') || p.price > 10000000000);
-  } else if (inputText.value.includes('Bình Chánh')) {
-    return propertyStore.items.filter(p => p.address.includes('Bình Chánh') || p.price < 6000000000);
+
+  const targetArea = extractedEntities.value.area || '';
+  // Extract district/city name, e.g. "Quận 7" from "Quận 7, TP.HCM"
+  const cleanArea = targetArea.split(',')[0].trim();
+  const normalizedArea = normalizeVietnamese(cleanArea);
+
+  // Only return matches if area is specific (not generic fallback)
+  if (!cleanArea || cleanArea === 'Chưa rõ' || normalizedArea === 'tp ho chi minh' || normalizedArea === 'ha noi') {
+    return [];
   }
-  // Default fallback matching
-  return propertyStore.items.slice(0, 2);
+
+  const matches = propertyStore.items.filter(p => {
+    if (!p.address) return false;
+    const normalizedAddr = normalizeVietnamese(p.address);
+    const normalizedTitle = normalizeVietnamese(p.title || '');
+    return normalizedAddr.includes(normalizedArea) || normalizedTitle.includes(normalizedArea);
+  });
+
+  // Do NOT fallback to all items — return empty if no match
+  return matches.slice(0, 3);
 });
 
 // Classification trigger
-function startAnalysis() {
+async function startAnalysis() {
   if (!inputText.value.trim()) {
     toastStore.warning('Thiếu dữ liệu', 'Vui lòng điền nội dung yêu cầu hoặc chọn một mẫu thử nghiệm bên dưới.');
     return;
@@ -71,66 +96,216 @@ function startAnalysis() {
   isAnalyzing.value = true;
   showAnalysisResults.value = false;
 
-  // Simulate AI parsing delay
-  setTimeout(() => {
-    isAnalyzing.value = false;
-    showAnalysisResults.value = true;
-    
-    // Dynamic extraction based on keywords
-    if (inputText.value.toLowerCase().includes('quận 7')) {
-      extractedEntities.value = {
-        intent: 'Tìm mua căn hộ',
-        area: 'Quận 7, TP.HCM',
-        budget: 'Khoảng 10 - 15 tỷ VNĐ',
-        type: 'Căn hộ cao cấp 3PN',
-        bedrooms: '3 PN',
-        urgency: 'Cao (Hot Lead)',
-        score: 95
-      };
-    } else if (inputText.value.toLowerCase().includes('bình thạnh')) {
-      extractedEntities.value = {
-        intent: 'Đầu tư nhà phố kinh doanh',
-        area: 'Quận Bình Thạnh, TP.HCM',
-        budget: 'Dưới 30 tỷ VNĐ',
-        type: 'Nhà phố thương mại',
-        bedrooms: '4+ PN',
-        urgency: 'Trung bình (Warm)',
-        score: 89
-      };
-    } else if (inputText.value.toLowerCase().includes('bình chánh')) {
-      extractedEntities.value = {
-        intent: 'Mua đất nền thổ cư',
-        area: 'Bình Chánh, TP.HCM',
-        budget: 'Dưới 5 tỷ VNĐ',
-        type: 'Đất nền dự án',
-        bedrooms: 'N/A',
-        urgency: 'Thấp (Cold)',
-        score: 74
-      };
-    } else {
-      extractedEntities.value = {
-        intent: 'Nhu cầu Bất động sản',
-        area: 'TP. Hồ Chí Minh',
-        budget: 'Chưa xác định',
-        type: 'Căn hộ chung cư',
-        bedrooms: '2-3 PN',
-        urgency: 'Trung bình',
-        score: 82
-      };
-    }
+  try {
+    const systemPrompt = `Bạn là một AI phân loại nhu cầu bất động sản. Hãy phân tích yêu cầu sau và trích xuất thông tin dưới dạng JSON duy nhất. JSON phải có định dạng chính xác sau đây (không kèm theo ký tự markdown hay lời dẫn):
+{
+  "intent": "Mô tả ý định ngắn gọn (ví dụ: Tìm mua căn hộ, Thuê nhà phố...)",
+  "area": "Khu vực tìm kiếm cụ thể (ví dụ: Quận 7, TP.HCM hoặc Vĩnh Cửu, Đồng Nai)",
+  "budget": "Ngân sách (ví dụ: Dưới 12 tỷ VND)",
+  "type": "Loại BĐS (ví dụ: Căn hộ chung cư)",
+  "bedrooms": "Số phòng ngủ (ví dụ: 3 PN)",
+  "urgency": "Độ khẩn cấp: Cao (Hot Lead) hoặc Trung bình (Warm) hoặc Thấp (Cold)",
+  "score": Điểm số tiềm năng từ 0 đến 100 (số nguyên)
+}
 
-    toastStore.success('Phân tích hoàn tất', 'AI đã trích xuất thành công nhu cầu và liên kết kho hàng phù hợp.');
-  }, 1500);
+Yêu cầu cần phân tích: "${inputText.value}"`;
+
+    const { data: res } = await api.post('/ai-chat', { message: systemPrompt }, { timeout: 35000 });
+
+    if (res && res.data) {
+      let jsonText = res.data.trim();
+
+      // Extract the JSON object using regex to handle any prefix/suffix conversational text
+      const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonText = jsonMatch[0];
+      }
+
+      const parsed = JSON.parse(jsonText);
+      if (parsed.intent || parsed.area) {
+        extractedEntities.value = {
+          intent: parsed.intent || 'Nhu cầu Bất động sản',
+          area: parsed.area || 'Chưa rõ',
+          budget: parsed.budget || 'Chưa rõ',
+          type: parsed.type || 'Chưa rõ',
+          bedrooms: parsed.bedrooms || 'Chưa rõ',
+          urgency: parsed.urgency || 'Trung bình (Warm)',
+          score: typeof parsed.score === 'number' ? parsed.score : 80
+        };
+        showAnalysisResults.value = true;
+        toastStore.success('Phân tích hoàn tất', 'AI đã trích xuất thành công nhu cầu và liên kết kho hàng phù hợp.');
+        return;
+      }
+    }
+    throw new Error('Invalid AI response format');
+  } catch (err) {
+    console.warn('AI analysis API failed, falling back to local simulation:', err);
+    runLocalFallback();
+  } finally {
+    isAnalyzing.value = false;
+  }
+}
+
+function runLocalFallback() {
+  showAnalysisResults.value = true;
+  const prompt = inputText.value.trim();
+  const lowerPrompt = normalizeVietnamese(prompt);
+
+  // 1. Detect Area — TP.HCM districts
+  let area = 'Chưa rõ';
+
+  // Đồng Nai
+  if (lowerPrompt.includes('vinh cuu') || lowerPrompt.includes('vinh cửu')) area = 'Vĩnh Cửu, Đồng Nai';
+  else if (lowerPrompt.includes('nhon trach') || lowerPrompt.includes('nhơn trạch')) area = 'Nhơn Trạch, Đồng Nai';
+  else if (lowerPrompt.includes('long thanh') || lowerPrompt.includes('long thành')) area = 'Long Thành, Đồng Nai';
+  else if (lowerPrompt.includes('trang bom') || lowerPrompt.includes('trảng bom')) area = 'Trảng Bom, Đồng Nai';
+  else if (lowerPrompt.includes('bien hoa') || lowerPrompt.includes('biên hòa')) area = 'Biên Hòa, Đồng Nai';
+  else if (lowerPrompt.includes('dong nai') || lowerPrompt.includes('đồng nai')) area = 'Đồng Nai';
+  // Bình Dương
+  else if (lowerPrompt.includes('thu dau mot') || lowerPrompt.includes('thủ dầu một')) area = 'Thủ Dầu Một, Bình Dương';
+  else if (lowerPrompt.includes('thuan an') || lowerPrompt.includes('thuận an')) area = 'Thuận An, Bình Dương';
+  else if (lowerPrompt.includes('di an') || lowerPrompt.includes('dĩ an')) area = 'Dĩ An, Bình Dương';
+  else if (lowerPrompt.includes('binh duong') || lowerPrompt.includes('bình dương')) area = 'Bình Dương';
+  // HCM quận số
+  else if (lowerPrompt.includes('quan 12') || lowerPrompt.includes('quận 12')) area = 'Quận 12, TP.HCM';
+  else if (lowerPrompt.includes('quan 11') || lowerPrompt.includes('quận 11')) area = 'Quận 11, TP.HCM';
+  else if (lowerPrompt.includes('quan 10') || lowerPrompt.includes('quận 10')) area = 'Quận 10, TP.HCM';
+  else if (lowerPrompt.includes('quan 9') || lowerPrompt.includes('quận 9')) area = 'Quận 9, TP.HCM';
+  else if (lowerPrompt.includes('quan 8') || lowerPrompt.includes('quận 8')) area = 'Quận 8, TP.HCM';
+  else if (lowerPrompt.includes('quan 7') || lowerPrompt.includes('quận 7')) area = 'Quận 7, TP.HCM';
+  else if (lowerPrompt.includes('quan 6') || lowerPrompt.includes('quận 6')) area = 'Quận 6, TP.HCM';
+  else if (lowerPrompt.includes('quan 5') || lowerPrompt.includes('quận 5')) area = 'Quận 5, TP.HCM';
+  else if (lowerPrompt.includes('quan 4') || lowerPrompt.includes('quận 4')) area = 'Quận 4, TP.HCM';
+  else if (lowerPrompt.includes('quan 3') || lowerPrompt.includes('quận 3')) area = 'Quận 3, TP.HCM';
+  else if (lowerPrompt.includes('quan 2') || lowerPrompt.includes('quận 2')) area = 'Quận 2, TP.HCM';
+  else if (lowerPrompt.includes('quan 1') || lowerPrompt.includes('quận 1')) area = 'Quận 1, TP.HCM';
+  // HCM quận tên
+  else if (lowerPrompt.includes('binh thanh') || lowerPrompt.includes('bình thạnh')) area = 'Quận Bình Thạnh, TP.HCM';
+  else if (lowerPrompt.includes('go vap') || lowerPrompt.includes('gò vấp')) area = 'Quận Gò Vấp, TP.HCM';
+  else if (lowerPrompt.includes('phu nhuan') || lowerPrompt.includes('phú nhuận')) area = 'Quận Phú Nhuận, TP.HCM';
+  else if (lowerPrompt.includes('tan binh') || lowerPrompt.includes('tân bình')) area = 'Quận Tân Bình, TP.HCM';
+  else if (lowerPrompt.includes('tan phu') || lowerPrompt.includes('tân phú')) area = 'Quận Tân Phú, TP.HCM';
+  else if (lowerPrompt.includes('binh tan') || lowerPrompt.includes('bình tân')) area = 'Quận Bình Tân, TP.HCM';
+  else if (lowerPrompt.includes('thu duc') || lowerPrompt.includes('thủ đức')) area = 'TP. Thủ Đức, TP.HCM';
+  else if (lowerPrompt.includes('binh chanh') || lowerPrompt.includes('bình chánh')) area = 'Huyện Bình Chánh, TP.HCM';
+  else if (lowerPrompt.includes('hoc mon') || lowerPrompt.includes('hóc môn')) area = 'Huyện Hóc Môn, TP.HCM';
+  else if (lowerPrompt.includes('nha be') || lowerPrompt.includes('nhà bè')) area = 'Huyện Nhà Bè, TP.HCM';
+  else if (lowerPrompt.includes('cu chi') || lowerPrompt.includes('củ chi')) area = 'Huyện Củ Chi, TP.HCM';
+  else if (lowerPrompt.includes('thu thiem') || lowerPrompt.includes('thủ thiêm')) area = 'Thủ Thiêm, TP.HCM';
+  // Hà Nội
+  else if (lowerPrompt.includes('hoan kiem') || lowerPrompt.includes('hoàn kiếm')) area = 'Quận Hoàn Kiếm, Hà Nội';
+  else if (lowerPrompt.includes('cau giay') || lowerPrompt.includes('cầu giấy')) area = 'Quận Cầu Giấy, Hà Nội';
+  else if (lowerPrompt.includes('dong da') || lowerPrompt.includes('đống đa')) area = 'Quận Đống Đa, Hà Nội';
+  else if (lowerPrompt.includes('ha noi') || lowerPrompt.includes('hà nội')) area = 'Hà Nội';
+  // Vũng Tàu
+  else if (lowerPrompt.includes('vung tau') || lowerPrompt.includes('vũng tàu')) area = 'TP. Vũng Tàu';
+  // Long An
+  else if (lowerPrompt.includes('ben luc') || lowerPrompt.includes('bến lức')) area = 'Bến Lức, Long An';
+  else if (lowerPrompt.includes('duc hoa') || lowerPrompt.includes('đức hòa')) area = 'Đức Hòa, Long An';
+  else if (lowerPrompt.includes('long an')) area = 'Long An';
+  // Generic HCM fallback
+  else if (lowerPrompt.includes('ho chi minh') || lowerPrompt.includes('hồ chí minh') || lowerPrompt.includes('tphcm') || lowerPrompt.includes('tp.hcm')) area = 'TP.HCM';
+
+  // 2. Detect Type
+  let type = 'Bất động sản';
+  if (lowerPrompt.includes('can ho') || lowerPrompt.includes('chung cu') || lowerPrompt.includes('căn hộ') || lowerPrompt.includes('chung cư')) type = 'Căn hộ chung cư';
+  else if (lowerPrompt.includes('nha pho') || lowerPrompt.includes('nha rieng') || lowerPrompt.includes('nhà phố') || lowerPrompt.includes('nhà riêng')) type = 'Nhà phố';
+  else if (lowerPrompt.includes('dat nen') || lowerPrompt.includes('dat') || lowerPrompt.includes('đất nền') || lowerPrompt.includes('đất')) type = 'Đất nền';
+  else if (lowerPrompt.includes('biet thu') || lowerPrompt.includes('biệt thự') || lowerPrompt.includes('villa')) type = 'Biệt thự / Villa';
+  else if (lowerPrompt.includes('mat bang') || lowerPrompt.includes('van phong') || lowerPrompt.includes('mặt bằng') || lowerPrompt.includes('văn phòng')) type = 'Mặt bằng thương mại';
+
+  // 3. Detect Budget
+  let budget = 'Chưa xác định';
+  const budgetMatch = prompt.match(/(\d+(?:[.,]\d+)?)\s*(tỷ|ty|triệu|trieu|tr|t|usd)/i);
+  if (budgetMatch) {
+    const val = budgetMatch[1];
+    const unit = budgetMatch[2].toLowerCase();
+    const displayUnit = (unit === 'tỷ' || unit === 'ty' || unit === 't') ? 'tỷ VND' : (unit === 'usd' ? 'USD' : 'triệu VND');
+    const lowerP = lowerPrompt;
+    if (lowerP.includes('duoi') || lowerP.includes('dưới')) budget = `Dưới ${val} ${displayUnit}`;
+    else if (lowerP.includes('tren') || lowerP.includes('trên') || lowerP.includes('khoang') || lowerP.includes('khoảng') || lowerP.includes('tam') || lowerP.includes('tầm')) budget = `Khoảng ${val} ${displayUnit}`;
+    else budget = `${val} ${displayUnit}`;
+  }
+
+  // 4. Intent
+  let intent = 'Tìm mua ' + type.toLowerCase();
+  if (lowerPrompt.includes('thue') || lowerPrompt.includes('thuê') || lowerPrompt.includes('cho thue')) {
+    intent = 'Tìm thuê ' + type.toLowerCase();
+  } else if (lowerPrompt.includes('ban') || lowerPrompt.includes('bán') || lowerPrompt.includes('ky goi') || lowerPrompt.includes('ký gửi')) {
+    intent = 'Bán/Ký gửi ' + type.toLowerCase();
+  }
+
+  // 5. Bedrooms
+  let bedrooms = 'Chưa rõ';
+  const brMatch = prompt.match(/(\d+)\s*(pn|phòng ngủ|phong ngu|phòng|phong)/i);
+  if (brMatch) {
+    bedrooms = `${brMatch[1]} PN`;
+  }
+
+  // 6. Urgency & Score
+  let urgency = 'Trung bình (Warm)';
+  let score = 82;
+  const isUrgent = lowerPrompt.includes('gap') || lowerPrompt.includes('gấp') || lowerPrompt.includes('ngay') || lowerPrompt.includes('khan cap') || lowerPrompt.includes('khẩn cấp');
+  if (isUrgent) {
+    urgency = 'Cao (Hot Lead)';
+    score = 95;
+  } else if (budget !== 'Chưa xác định') {
+    score = 88;
+  }
+
+  extractedEntities.value = { intent, area, budget, type, bedrooms, urgency, score };
+
+  toastStore.success('Phân tích hoàn tất (Giả lập)', 'Đã phân tích thông tin và liên kết kho hàng phù hợp.');
 }
 
 function sendToLead() {
   toastStore.success('Đã gửi đề xuất', 'Đã chuyển tiếp thông tin các căn hộ phù hợp nhất đến Zalo/Viber của khách hàng.');
 }
 
-// History Logs state
-const jobsList = ref(mockAiJobs);
-</script>
+const stats = ref({
+  totalClassified: 1482,
+  avgLatency: 142,
+  accuracy: 94.8,
+  acceptanceRate: 91.3
+});
 
+const jobsList = ref<any[]>([]);
+
+onMounted(async () => {
+  propertyStore.fetchProperties();
+
+  try {
+    const { data: res } = await api.get('/crawlers/stats');
+    if (res && res.data) {
+      stats.value = {
+        totalClassified: res.data.totalClassified,
+        avgLatency: res.data.avgLatencyMs,
+        accuracy: res.data.accuracy,
+        acceptanceRate: res.data.acceptanceRate
+      };
+    }
+  } catch (err) {
+    console.error('Failed to load stats:', err);
+  }
+
+  try {
+    const { data: res } = await api.get('/crawlers/jobs');
+    if (res && res.data) {
+      jobsList.value = res.data.map((j: any) => ({
+        id: j.id,
+        target: j.sourceName,
+        type: 'property',
+        result: j.log ? j.log.split('\n')[0] : 'Cào tin đăng thành công',
+        confidence: 85 + (j.successCount > 0 ? 10 : 0),
+        createdAt: j.startedAt ?? new Date().toISOString(),
+        status: j.status === 'Completed' ? 'completed' : 'review'
+      }));
+    }
+  } catch (err) {
+    console.error('Failed to load jobs:', err);
+  }
+});
+</script>
 <template>
   <RoleGate :roles="['Admin', 'Manager', 'Sales']">
     <div class="page">
@@ -138,22 +313,22 @@ const jobsList = ref(mockAiJobs);
       <div class="metrics-row">
       <div class="metric-card glass-card">
         <span class="label">Tổng số bản ghi đã phân loại</span>
-        <strong class="value numeric">1,482</strong>
+        <strong class="value numeric">{{ stats.totalClassified.toLocaleString() }}</strong>
         <span class="trend success">+14.2% tuần này</span>
       </div>
       <div class="metric-card glass-card">
         <span class="label">Độ chính xác mô hình NLP</span>
-        <strong class="value numeric">94.8%</strong>
+        <strong class="value numeric">{{ stats.accuracy }}%</strong>
         <span class="trend success">Đã hiệu chuẩn</span>
       </div>
       <div class="metric-card glass-card">
         <span class="label">Tốc độ xử lý trung bình</span>
-        <strong class="value numeric">142ms</strong>
+        <strong class="value numeric">{{ stats.avgLatency }}ms</strong>
         <span class="trend info">Fast Latency</span>
       </div>
       <div class="metric-card glass-card">
         <span class="label">Đề xuất được môi giới chấp nhận</span>
-        <strong class="value numeric">91.3%</strong>
+        <strong class="value numeric">{{ stats.acceptanceRate }}%</strong>
         <span class="trend success">+2.1% so với tháng trước</span>
       </div>
     </div>
@@ -853,3 +1028,4 @@ const jobsList = ref(mockAiJobs);
 .status-indicator.processing { color: var(--color-info); }
 .status-indicator.processing::before { background-color: var(--color-info); }
 </style>
+

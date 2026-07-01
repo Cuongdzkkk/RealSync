@@ -9,7 +9,7 @@ using RealSync.Shared.Exceptions;
 
 namespace RealSync.Services.Implementations;
 
-public class R2FileStorageService : IFileStorageService
+public class R2FileStorageService
 {
     private readonly R2StorageOptions _options;
 
@@ -85,4 +85,10 @@ public class R2FileStorageService : IFileStorageService
 
         return $"{_options.Endpoint!.TrimEnd('/')}/{_options.BucketName}/{normalizedKey}";
     }
+}
+
+public class FileStorageResult
+{
+    public string Key { get; set; } = string.Empty;
+    public string Url { get; set; } = string.Empty;
 }

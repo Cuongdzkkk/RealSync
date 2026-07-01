@@ -221,9 +221,7 @@ function getAIResponse(query: string): string {
 <template>
   <div
     class="floating-ai-wrapper"
-    :class="{ 'is-hidden': !isVisible, 'is-dragging': isDragging }"
-    :style="wrapperStyle"
-    @pointerdown="startDrag"
+    :class="{ 'is-hidden': !isVisible }"
   >
     <button
       v-if="!isVisible"
@@ -338,17 +336,9 @@ function getAIResponse(query: string): string {
 <style scoped>
 .floating-ai-wrapper {
   position: fixed;
+  bottom: 24px;
+  right: 24px;
   z-index: var(--z-toast);
-  touch-action: none;
-  user-select: none;
-}
-
-.floating-ai-wrapper.is-hidden {
-  right: auto;
-}
-
-.floating-ai-wrapper.is-dragging {
-  cursor: grabbing;
 }
 
 .ai-restore-btn,
@@ -411,12 +401,7 @@ function getAIResponse(query: string): string {
 
 .ai-trigger-btn,
 .chat-header {
-  cursor: grab;
-}
-
-.floating-ai-wrapper.is-dragging .ai-trigger-btn,
-.floating-ai-wrapper.is-dragging .chat-header {
-  cursor: grabbing;
+  cursor: pointer;
 }
 
 .ai-trigger-btn:hover {

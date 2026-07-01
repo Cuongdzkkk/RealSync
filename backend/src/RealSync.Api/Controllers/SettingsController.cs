@@ -1,13 +1,20 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net.Http;
+using System.Text.Json;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.IO;
-using System.Text.Json;
+using Microsoft.Extensions.Options;
+using RealSync.Services.Options;
+using RealSync.Shared.DTOs.Responses;
+using RealSync.Shared.Exceptions;
 
 namespace RealSync.Api.Controllers;
 
 /// <summary>
-/// Controller quản lý cấu hình các kênh đăng bài.
-/// Route: /api/v1/settings/channels
+/// Controller quản lý cấu hình các kênh đăng bài và hệ thống.
 /// </summary>
 [Authorize]
 [Route("api/v1/settings")]
@@ -16,12 +23,20 @@ public class SettingsController : BaseController
 {
     private static readonly string ProjectRoot = FindProjectRoot();
     private static readonly string ConfigPath = Path.Combine(ProjectRoot, "channels_config.json");
+    private static readonly string PlatformConfigPath = Path.Combine(ProjectRoot, "platform_config.json");
+
+    private readonly IOptions<AIOptions> _aiOptions;
+
+    public SettingsController(IOptions<AIOptions> aiOptions)
+    {
+        _aiOptions = aiOptions;
+    }
 
     /// <summary>
     /// Lấy cấu hình các kênh hiện tại.
     /// </summary>
     [HttpGet("channels")]
-    [ProducesResponseType(typeof(Shared.DTOs.Responses.ApiResponse<ChannelsConfigDto>), 200)]
+    [ProducesResponseType(typeof(ApiResponse<ChannelsConfigDto>), 200)]
     public IActionResult GetChannelsConfig()
     {
         var config = new ChannelsConfigDto();
@@ -45,7 +60,7 @@ public class SettingsController : BaseController
     /// Lưu cấu hình các kênh mới.
     /// </summary>
     [HttpPost("channels")]
-    [ProducesResponseType(typeof(Shared.DTOs.Responses.ApiResponse<ChannelsConfigDto>), 200)]
+    [ProducesResponseType(typeof(ApiResponse<ChannelsConfigDto>), 200)]
     public IActionResult SaveChannelsConfig([FromBody] ChannelsConfigDto request)
     {
         try
@@ -58,6 +73,135 @@ public class SettingsController : BaseController
         catch (Exception ex)
         {
             return BadRequest(new { message = $"Lỗi khi lưu cấu hình: {ex.Message}" });
+        }
+    }
+
+    /// <summary>
+    /// Lấy thông tin cấu hình AI hiện tại ở backend.
+    /// </summary>
+    [HttpGet("ai-info")]
+    [ProducesResponseType(typeof(ApiResponse<object>), 200)]
+    public IActionResult GetAiInfo()
+    {
+        return OkResponse(new
+        {
+            provider = _aiOptions.Value.Provider,
+            model = _aiOptions.Value.Model,
+            isConfigured = _aiOptions.Value.IsConfigured
+        });
+    }
+
+    /// <summary>
+    /// Lấy cấu hình Platform Template (Mẫu cấu trúc thương hiệu).
+    /// </summary>
+    [HttpGet("platform")]
+    [ProducesResponseType(typeof(ApiResponse<PlatformConfigDto>), 200)]
+    public IActionResult GetPlatformConfig()
+    {
+        var config = new PlatformConfigDto();
+        if (System.IO.File.Exists(PlatformConfigPath))
+        {
+            try
+            {
+                var content = System.IO.File.ReadAllText(PlatformConfigPath);
+                var loaded = JsonSerializer.Deserialize<PlatformConfigDto>(content);
+                if (loaded != null)
+                {
+                    config = loaded;
+                }
+            }
+            catch { /* bypass */ }
+        }
+        return OkResponse(config);
+    }
+
+    /// <summary>
+    /// Lưu cấu hình Platform Template (Mẫu cấu trúc thương hiệu).
+    /// </summary>
+    [HttpPost("platform")]
+    [ProducesResponseType(typeof(ApiResponse<PlatformConfigDto>), 200)]
+    public IActionResult SavePlatformConfig([FromBody] PlatformConfigDto request)
+    {
+        try
+        {
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            var content = JsonSerializer.Serialize(request, options);
+            System.IO.File.WriteAllText(PlatformConfigPath, content);
+            return OkResponse(request, "Đã lưu mẫu cấu trúc bài viết thành công.");
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = $"Lỗi khi lưu cấu hình: {ex.Message}" });
+        }
+    }
+
+    /// <summary>
+    /// Trao đổi Authorization Code lấy Access Token và Refresh Token từ Zalo OA.
+    /// </summary>
+    [HttpPost("zalo/exchange-token")]
+    [ProducesResponseType(typeof(ApiResponse<ZaloTokenExchangeResponse>), 200)]
+    public async Task<IActionResult> ExchangeZaloToken([FromBody] ZaloTokenExchangeRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Code))
+            throw new BusinessException("Mã phân quyền (Authorization Code) không được để trống.");
+        if (string.IsNullOrWhiteSpace(request.AppId))
+            throw new BusinessException("Zalo App ID không được để trống.");
+        if (string.IsNullOrWhiteSpace(request.AppSecret))
+            throw new BusinessException("Zalo App Secret không được để trống.");
+
+        try
+        {
+            using var client = new HttpClient();
+            var tokenUrl = "https://oauth.zalo.me/v2.0/oa/access_token";
+
+            var formContent = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                { "code", request.Code },
+                { "app_id", request.AppId },
+                { "grant_type", "authorization_code" }
+            });
+
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, tokenUrl);
+            httpRequest.Headers.Add("secret_key", request.AppSecret);
+            httpRequest.Content = formContent;
+
+            var response = await client.SendAsync(httpRequest);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new BusinessException($"Lỗi kết nối Zalo API ({response.StatusCode}): {responseContent}");
+            }
+
+            using var doc = JsonDocument.Parse(responseContent);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("error", out var errEl))
+            {
+                var errCode = errEl.GetInt32();
+                if (errCode != 0)
+                {
+                    var errMsg = root.TryGetProperty("error_description", out var descEl) ? descEl.GetString() : "Lỗi không xác định từ Zalo";
+                    throw new BusinessException($"Lỗi Zalo OA OAuth (Mã {errCode}): {errMsg}");
+                }
+            }
+
+            var accessToken = root.GetProperty("access_token").GetString() ?? "";
+            var refreshToken = root.TryGetProperty("refresh_token", out var refEl) ? refEl.GetString() : "";
+            var expiresInStr = root.TryGetProperty("expires_in", out var expEl) ? expEl.GetString() : "86400";
+            int.TryParse(expiresInStr, out var expiresIn);
+            if (expiresIn == 0) expiresIn = 86400;
+
+            return OkResponse(new ZaloTokenExchangeResponse
+            {
+                AccessToken = accessToken,
+                RefreshToken = refreshToken ?? "",
+                ExpiresInSeconds = expiresIn
+            }, "Trao đổi mã token Zalo OA thành công.");
+        }
+        catch (Exception ex)
+        {
+            throw new BusinessException($"Không thể lấy token Zalo OA. Chi tiết: {ex.Message}");
         }
     }
 
@@ -77,7 +221,7 @@ public class SettingsController : BaseController
     /// Lấy danh sách trang Facebook được quản lý bởi token người dùng.
     /// </summary>
     [HttpPost("facebook/fetch-pages")]
-    [ProducesResponseType(typeof(Shared.DTOs.Responses.ApiResponse<List<FacebookPageDto>>), 200)]
+    [ProducesResponseType(typeof(ApiResponse<List<FacebookPageDto>>), 200)]
     public async Task<IActionResult> FetchFacebookPages([FromBody] FetchFacebookPagesRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.UserAccessToken))
@@ -90,7 +234,6 @@ public class SettingsController : BaseController
             using var client = new HttpClient();
             var userToken = request.UserAccessToken;
 
-            // 1. Exchange short-lived token to long-lived if app id & secret are provided
             if (!string.IsNullOrWhiteSpace(request.AppId) && !string.IsNullOrWhiteSpace(request.AppSecret))
             {
                 var exchangeUrl = $"https://graph.facebook.com/v22.0/oauth/access_token?grant_type=fb_exchange_token&client_id={request.AppId}&client_secret={request.AppSecret}&fb_exchange_token={request.UserAccessToken}";
@@ -119,7 +262,6 @@ public class SettingsController : BaseController
                 }
             }
 
-            // 2. Fetch pages list
             var accountsUrl = $"https://graph.facebook.com/v22.0/me/accounts?access_token={userToken}&limit=100";
             var accountsResponse = await client.GetAsync(accountsUrl);
             var accountsContent = await accountsResponse.Content.ReadAsStringAsync();
@@ -178,6 +320,26 @@ public class ChannelsConfigDto
     public string FacebookGroupIds { get; set; } = string.Empty;
 }
 
+public class PlatformConfigDto
+{
+    public bool UsePlatformTemplate { get; set; } = false;
+    public string TemplateContent { get; set; } = string.Empty;
+}
+
+public class ZaloTokenExchangeRequest
+{
+    public string Code { get; set; } = string.Empty;
+    public string AppId { get; set; } = string.Empty;
+    public string AppSecret { get; set; } = string.Empty;
+}
+
+public class ZaloTokenExchangeResponse
+{
+    public string AccessToken { get; set; } = string.Empty;
+    public string RefreshToken { get; set; } = string.Empty;
+    public int ExpiresInSeconds { get; set; } = 86400;
+}
+
 public class FetchFacebookPagesRequest
 {
     public string UserAccessToken { get; set; } = string.Empty;
@@ -191,4 +353,3 @@ public class FacebookPageDto
     public string Name { get; set; } = string.Empty;
     public string AccessToken { get; set; } = string.Empty;
 }
-
