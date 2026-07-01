@@ -436,7 +436,7 @@ onMounted(async () => {
             <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
           </el-table-column>
 
-          <el-table-column label="Actions" width="126" align="right">
+          <el-table-column label="Actions" width="160" align="right">
             <template #default="{ row }">
               <div class="table-actions">
                 <el-button circle :icon="ViewIcon" title="View detail" @click="router.push({ name: 'property-detail', params: { id: row.id } })" />

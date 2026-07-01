@@ -69,9 +69,16 @@ export const usePostStore = defineStore('post', () => {
         propertyId: validPropertyId,
       });
 
-      // 3. Cập nhật state
-      currentPost.value = post;
-      posts.value.unshift(post);
+      // 3. Cập nhật nội dung bài đăng vào trường Content của Post
+      const updatedPost = await postingService.updatePost(post.id, {
+        title: post.title,
+        content: result.generatedContent,
+        propertyId: validPropertyId,
+      });
+
+      // 4. Cập nhật state
+      currentPost.value = updatedPost;
+      posts.value.unshift(updatedPost);
 
       return result;
     } finally {
@@ -99,6 +106,25 @@ export const usePostStore = defineStore('post', () => {
     }
   }
 
+  /** Áp dụng bản nháp AI đã chỉnh sửa */
+  async function applyAiContent(postId: string, content: string, summary?: string) {
+    loading.value = true;
+    try {
+      await postingService.applyAiContent(postId, content, summary);
+      if (currentPost.value && currentPost.value.id === postId) {
+        currentPost.value.content = content;
+        if (summary) currentPost.value.summary = summary;
+      }
+      const idx = posts.value.findIndex(p => p.id === postId);
+      if (idx !== -1) {
+        posts.value[idx].content = content;
+        if (summary) posts.value[idx].summary = summary;
+      }
+    } finally {
+      loading.value = false;
+    }
+  }
+
   return {
     posts,
     currentPost,
@@ -110,5 +136,6 @@ export const usePostStore = defineStore('post', () => {
     generateContent,
     fetchAiHistory,
     fetchAllHistory,
+    applyAiContent,
   };
 });

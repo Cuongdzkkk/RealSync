@@ -11,4 +11,6 @@ public interface IAIContentService
     Task<AIContentGenerationResponse> GenerateAsync(Guid postId, AIContentGenerateRequest request);
     Task<IEnumerable<AIContentGenerationResponse>> GetHistoryAsync(Guid postId);
     Task<AIContentGenerationResponse> GetByIdAsync(Guid postId, Guid id);
+    Task<string> ChatAsync(string message);
+    Task ApplyAsync(Guid postId, ApplyAIContentRequest request);
 }

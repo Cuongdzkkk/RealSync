@@ -25,7 +25,7 @@ export const postingService = {
   /** Sinh nội dung AI cho bài đăng */
   async generateContent(postId: string, request: AIContentGenerateRequest): Promise<AIContentGeneration> {
     const { data } = await api.post(`/posts/${postId}/ai-content/generate`, request, {
-      timeout: 120000
+      timeout: 35000
     });
     return data.data;
   },
@@ -45,5 +45,28 @@ export const postingService = {
   /** Xoá bài đăng (soft delete) */
   async deletePost(id: string): Promise<void> {
     await api.delete(`/posts/${id}`);
-  }
+  },
+
+  /** Tạo kênh đăng bài cho post */
+  async createChannel(postId: string, channel: string): Promise<any> {
+    const { data: res } = await api.post(`/posts/${postId}/channels`, { channel });
+    return res.data;
+  },
+
+  /** Lấy danh sách các kênh đăng bài của post */
+  async getChannels(postId: string): Promise<any[]> {
+    const { data: res } = await api.get(`/posts/${postId}/channels`);
+    return res.data;
+  },
+
+  /** Thực thi đăng bài lên kênh */
+  async publishChannel(postId: string, channelId: string): Promise<any> {
+    const { data: res } = await api.post(`/posts/${postId}/channels/${channelId}/publish`);
+    return res.data;
+  },
+
+  /** Áp dụng bản nháp AI đã chỉnh sửa */
+  async applyAiContent(postId: string, content: string, summary?: string): Promise<void> {
+    await api.post(`/posts/${postId}/ai-content/apply`, { content, summary });
+  },
 };

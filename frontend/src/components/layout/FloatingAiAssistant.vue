@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { ref, nextTick, computed, onMounted } from 'vue';
+import { api } from '@/services/api';
 
 interface Message {
   id: string;
@@ -140,7 +141,7 @@ function handleQuickAction(action: string) {
   sendMessage();
 }
 
-function sendMessage() {
+async function sendMessage() {
   if (!inputMsg.value.trim() || isResponding.value) return;
 
   const userText = inputMsg.value;
@@ -155,44 +156,51 @@ function sendMessage() {
   isResponding.value = true;
   scrollToBottom();
 
-  // Simulate AI response streaming
-  setTimeout(() => {
-    const aiMessageId = (Date.now() + 1).toString();
-    const fullAiResponse = getAIResponse(userText);
-    
-    messages.value.push({
-      id: aiMessageId,
-      sender: 'ai',
-      text: '',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isStreaming: true
-    });
-    
-    scrollToBottom();
+  const aiMessageId = Date.now().toString();
+  messages.value.push({
+    id: aiMessageId,
+    sender: 'ai',
+    text: 'RealSync AI Copilot đang soạn thảo...',
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    isStreaming: true
+  });
+  scrollToBottom();
 
-    let currentText = '';
-    let wordIndex = 0;
-    const words = fullAiResponse.split(' ');
-    
-    const streamInterval = setInterval(() => {
-      if (wordIndex < words.length) {
-        currentText += (wordIndex === 0 ? '' : ' ') + words[wordIndex];
-        const msgIndex = messages.value.findIndex(m => m.id === aiMessageId);
-        if (msgIndex !== -1) {
-          messages.value[msgIndex].text = currentText;
-        }
-        wordIndex++;
-        scrollToBottom();
-      } else {
-        clearInterval(streamInterval);
-        const msgIndex = messages.value.findIndex(m => m.id === aiMessageId);
-        if (msgIndex !== -1) {
-          messages.value[msgIndex].isStreaming = false;
-        }
-        isResponding.value = false;
+  let fullAiResponse = '';
+  try {
+    const response = await api.post('/ai-chat', { message: userText });
+    fullAiResponse = response.data.data;
+  } catch (error) {
+    fullAiResponse = getAIResponse(userText);
+  }
+
+  const msgIndex = messages.value.findIndex(m => m.id === aiMessageId);
+  if (msgIndex !== -1) {
+    messages.value[msgIndex].text = '';
+  }
+
+  let currentText = '';
+  let wordIndex = 0;
+  const words = fullAiResponse.split(' ');
+  
+  const streamInterval = setInterval(() => {
+    if (wordIndex < words.length) {
+      currentText += (wordIndex === 0 ? '' : ' ') + words[wordIndex];
+      const idx = messages.value.findIndex(m => m.id === aiMessageId);
+      if (idx !== -1) {
+        messages.value[idx].text = currentText;
       }
-    }, 80);
-  }, 1000);
+      wordIndex++;
+      scrollToBottom();
+    } else {
+      clearInterval(streamInterval);
+      const idx = messages.value.findIndex(m => m.id === aiMessageId);
+      if (idx !== -1) {
+        messages.value[idx].isStreaming = false;
+      }
+      isResponding.value = false;
+    }
+  }, 40);
 }
 
 function getAIResponse(query: string): string {
@@ -213,9 +221,7 @@ function getAIResponse(query: string): string {
 <template>
   <div
     class="floating-ai-wrapper"
-    :class="{ 'is-hidden': !isVisible, 'is-dragging': isDragging }"
-    :style="wrapperStyle"
-    @pointerdown="startDrag"
+    :class="{ 'is-hidden': !isVisible }"
   >
     <button
       v-if="!isVisible"
@@ -330,17 +336,9 @@ function getAIResponse(query: string): string {
 <style scoped>
 .floating-ai-wrapper {
   position: fixed;
+  bottom: 24px;
+  right: 24px;
   z-index: var(--z-toast);
-  touch-action: none;
-  user-select: none;
-}
-
-.floating-ai-wrapper.is-hidden {
-  right: auto;
-}
-
-.floating-ai-wrapper.is-dragging {
-  cursor: grabbing;
 }
 
 .ai-restore-btn,
@@ -403,12 +401,7 @@ function getAIResponse(query: string): string {
 
 .ai-trigger-btn,
 .chat-header {
-  cursor: grab;
-}
-
-.floating-ai-wrapper.is-dragging .ai-trigger-btn,
-.floating-ai-wrapper.is-dragging .chat-header {
-  cursor: grabbing;
+  cursor: pointer;
 }
 
 .ai-trigger-btn:hover {

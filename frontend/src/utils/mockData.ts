@@ -222,6 +222,14 @@ export const mockAiContents: AiContentItem[] = [
 
 export const mockUsers: WorkspaceUser[] = [
   {
+    id: 'u-008',
+    fullName: 'Lộc Agent',
+    email: 'loc@realsync.vn',
+    role: 'Agent',
+    status: 'active',
+    lastSeenAt: ''
+  },
+  {
     id: 'u-001',
     fullName: 'Nguyễn Quỳnh Lan',
     email: 'lan@realsync.vn',

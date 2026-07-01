@@ -35,7 +35,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/dashboard/DashboardView.vue'),
         meta: {
           title: 'Tổng quan',
-          roles: ['Admin', 'Manager', 'Sales', 'Marketing', 'Data Analyst']
+          roles: ['Admin', 'Manager', 'Sales', 'Marketing', 'Data Analyst', 'Agent']
         }
       },
       {
@@ -44,7 +44,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/properties/PropertyListView.vue'),
         meta: {
           title: 'Sản phẩm',
-          roles: ['Admin', 'Sales', 'Marketing']
+          roles: ['Admin', 'Sales', 'Marketing', 'Agent']
         }
       },
       {
@@ -167,7 +167,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/content/ContentAiView.vue'),
         meta: {
           title: 'Nội dung AI',
-          roles: ['Admin', 'Sales', 'Marketing']
+          roles: ['Admin', 'Sales', 'Marketing', 'Agent']
         }
       },
       {

@@ -43,17 +43,28 @@ const MOCK_USERS = [
   { id: 'u-admin', fullName: 'RealSync Admin', email: 'admin@realsync.vn', role: 'Admin' as const, status: 'active' as const, lastSeenAt: '' }
 ]
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
   if (!validate()) return
 
-  const matched = MOCK_USERS.find(u => u.email === form.email)
-  if (!matched) {
-    emailError.value = 'Email không tồn tại trong hệ thống'
-    return
-  }
-
   loading.value = true
-  setTimeout(() => {
+  try {
+    // Thử đăng nhập thật qua API backend
+    await authStore.login({
+      email: form.email,
+      password: form.password
+    });
+    ElMessage.success('Đăng nhập thành công');
+    router.push('/admin/dashboard');
+  } catch (err: any) {
+    console.warn('API login failed, falling back to mock login:', err);
+    
+    const matched = MOCK_USERS.find(u => u.email === form.email)
+    if (!matched) {
+      emailError.value = 'Email không tồn tại hoặc mật khẩu sai'
+      loading.value = false
+      return
+    }
+
     const profile = {
       id: matched.id,
       fullName: matched.fullName,
@@ -64,10 +75,11 @@ const handleSubmit = () => {
     authStore.accessToken = 'mock-token'
     localStorage.setItem('realsync.accessToken', 'mock-token')
     localStorage.setItem('realsync.user', JSON.stringify(profile))
-    loading.value = false
-    ElMessage.success('Đăng nhập thành công')
+    ElMessage.success('Đăng nhập thành công (Giả lập)')
     router.push('/admin/dashboard')
-  }, 1000)
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 

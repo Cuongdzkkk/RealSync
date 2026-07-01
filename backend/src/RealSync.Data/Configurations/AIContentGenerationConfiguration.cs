@@ -21,6 +21,20 @@ public class AIContentGenerationConfiguration : IEntityTypeConfiguration<AIConte
         builder.Property(e => e.GeneratedContent)
             .HasColumnType("nvarchar(max)");
 
+        builder.Property(e => e.PromptTokens)
+            .IsRequired(false);
+
+        builder.Property(e => e.CompletionTokens)
+            .IsRequired(false);
+
+        builder.Property(e => e.EstimatedCost)
+            .HasPrecision(18, 9)
+            .IsRequired(false);
+
+        builder.Property(e => e.FactsUsedJson)
+            .HasColumnType("nvarchar(max)")
+            .IsRequired(false);
+
         // Relationships
         builder.HasOne(e => e.Post)
             .WithMany(p => p.AIContentGenerations)

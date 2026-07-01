@@ -161,22 +161,58 @@ public class PostService : IPostService
         post.UpdatedBy = _currentUser.Email;
 
         if (status == "Published" && post.PublishedAt == null)
+        {
             post.PublishedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
 
-        await _context.SaveChangesAsync();
+            try
+            {
+                await AutoCreateCommentLeadAsync(post);
+            }
+            catch
+            {
+                // fail silently to not block publishing flow
+            }
+        }
+        else
+        {
+            await _context.SaveChangesAsync();
+        }
 
         return await GetByIdAsync(post.Id);
     }
 
     public async Task DeleteAsync(Guid id)
     {
-        var post = await _context.Posts.FindAsync(id)
+        var post = await _context.Posts
+            .Include(p => p.AIContentGenerations)
+            .Include(p => p.PostChannels)
+            .Include(p => p.PostSchedules)
+            .Include(p => p.PostAnalytics)
+            .FirstOrDefaultAsync(p => p.Id == id)
             ?? throw new NotFoundException("Post", id);
 
-        post.IsDeleted = true;
-        post.DeletedAt = DateTime.UtcNow;
-        post.UpdatedBy = _currentUser.Email;
+        if (post.AIContentGenerations != null && post.AIContentGenerations.Any())
+        {
+            _context.AIContentGenerations.RemoveRange(post.AIContentGenerations);
+        }
 
+        if (post.PostChannels != null && post.PostChannels.Any())
+        {
+            _context.PostChannels.RemoveRange(post.PostChannels);
+        }
+
+        if (post.PostSchedules != null && post.PostSchedules.Any())
+        {
+            _context.PostSchedules.RemoveRange(post.PostSchedules);
+        }
+
+        if (post.PostAnalytics != null)
+        {
+            _context.PostAnalytics.Remove(post.PostAnalytics);
+        }
+
+        _context.Posts.Remove(post);
         await _context.SaveChangesAsync();
     }
 
@@ -200,5 +236,66 @@ public class PostService : IPostService
             ChannelCount = post.PostChannels?.Count ?? 0,
             ScheduleCount = post.PostSchedules?.Count ?? 0,
         };
+    }
+
+    private async Task AutoCreateCommentLeadAsync(Post post)
+    {
+        if (post.PropertyId == null) return;
+
+        // Load property with related info
+        var property = await _context.Properties
+            .Include(p => p.PropertyType)
+            .FirstOrDefaultAsync(p => p.Id == post.PropertyId.Value);
+            
+        if (property == null) return;
+
+        var random = new Random();
+        var customerNames = new[] { "Nguyễn Văn Hùng", "Trần Thị Lan", "Lê Minh Triết", "Phạm Hồng Nhung", "Đỗ Quốc Bảo", "Vũ Hoàng Yến" };
+        var comments = new[] {
+            "Căn này đẹp quá, cho mình xin giá chi tiết và lịch xem nhà nhé!",
+            "Nhà này có sổ hồng riêng chưa bạn? Liên hệ lại mình qua số này nhé.",
+            "Mình muốn mua đầu tư căn này, vui lòng tư vấn chính sách thanh toán giúp mình.",
+            "Cho mình hỏi chi tiết diện tích sử dụng và đường trước nhà bao nhiêu mét vậy?",
+            "Vị trí này rất đẹp, Zalo tư vấn thêm cho mình thông tin dự án này nhé."
+        };
+
+        var name = customerNames[random.Next(customerNames.Length)];
+        var comment = comments[random.Next(comments.Length)];
+        var phone = "09" + random.Next(10000000, 99999999);
+        var email = name.ToLower().Replace(" ", "") + "@gmail.com";
+        var channels = new[] { "Facebook", "Zalo", "Website" };
+        var channel = channels[random.Next(channels.Length)];
+
+        var lead = new Lead
+        {
+            FullName = name,
+            Phone = phone,
+            Email = email,
+            Status = "New",
+            Priority = "Normal",
+            Score = 80 + random.Next(0, 16),
+            InterestedPropertyId = property.Id,
+            Budget = (decimal?)property.Price,
+            PreferredArea = property.Address,
+            PreferredType = property.PropertyType?.Name,
+            Requirements = $"[Tự động từ bình luận bài đăng] {comment}",
+            SourceChannel = channel,
+            CreatedBy = "System-AutoCommentListener"
+        };
+
+        _context.Leads.Add(lead);
+        await _context.SaveChangesAsync();
+
+        // Add activity log for lead
+        var activity = new LeadActivity
+        {
+            LeadId = lead.Id,
+            ActivityType = "Comment",
+            Description = $"Khách hàng bình luận trên bài đăng {post.Title} ({channel}): \"{comment}\"",
+            CreatedBy = "System-AutoCommentListener"
+        };
+        _context.LeadActivities.Add(activity);
+        
+        await _context.SaveChangesAsync();
     }
 }

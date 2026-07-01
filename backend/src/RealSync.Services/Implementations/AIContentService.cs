@@ -1,49 +1,48 @@
-using System.Diagnostics;
-using System.Net.Http.Json;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RealSync.Core.Entities;
-using RealSync.Core.Enums;
 using RealSync.Core.Interfaces;
+using RealSync.Core.Interfaces.Publishing;
 using RealSync.Data.Context;
 using RealSync.Services.Options;
 using RealSync.Shared.DTOs.Requests.Posts;
 using RealSync.Shared.DTOs.Responses.Posts;
+using Microsoft.Extensions.Logging;
 using RealSync.Shared.Exceptions;
 
 namespace RealSync.Services.Implementations;
 
 /// <summary>
 /// Service tạo nội dung bài đăng bằng AI.
-/// Ưu tiên: Gemini API key → opencode CLI (local, free) → Mock fallback.
 /// </summary>
 public class AIContentService : IAIContentService
 {
     private static readonly string ProjectRoot = FindProjectRoot();
-    private static bool? _isOpencodeAvailable;
-    private static readonly object _lock = new();
+    private static readonly string PlatformConfigPath = Path.Combine(ProjectRoot, "platform_config.json");
 
     private readonly RealSyncDbContext _context;
     private readonly ICurrentUserService _currentUser;
-    private readonly IActivityLogService _activityLogService;
-    private readonly HttpClient _httpClient;
+    private readonly IAITextProvider _aiProvider;
     private readonly AIOptions _aiOptions;
     private readonly ILogger<AIContentService> _logger;
 
     public AIContentService(
         RealSyncDbContext context,
         ICurrentUserService currentUser,
-        IActivityLogService activityLogService,
-        HttpClient httpClient,
+        IAITextProvider aiProvider,
         IOptions<AIOptions> aiOptions,
         ILogger<AIContentService> logger)
     {
         _context = context;
         _currentUser = currentUser;
-        _activityLogService = activityLogService;
-        _httpClient = httpClient;
+        _aiProvider = aiProvider;
         _aiOptions = aiOptions.Value;
         _logger = logger;
     }
@@ -59,19 +58,68 @@ public class AIContentService : IAIContentService
         if (string.IsNullOrWhiteSpace(request.Prompt))
             throw new BusinessException("Prompt không được để trống.");
 
-        // Ưu tiên: Gemini key → opencode CLI (local, free) → Mock
+        if (!_aiOptions.IsConfigured || string.IsNullOrWhiteSpace(_aiOptions.ApiKey))
+        {
+            throw new BusinessException("Gemini API Key chưa được cấu hình. Vui lòng thiết lập trong Cài đặt hệ thống.");
+        }
+
+
+
+        StructuredAIOutputResult providerResult;
         string generatedContent;
-        if (_aiOptions.IsConfigured)
+        int promptTokens;
+        int completionTokens;
+        decimal estimatedCost;
+        string factsUsedJson;
+
+        try
         {
-            generatedContent = await CallGeminiAsync(request.Prompt, post);
+            var propertyData = post.Property != null ? JsonSerializer.Serialize(new
+            {
+                title = post.Property.Title,
+                description = post.Property.Description,
+                price = post.Property.Price,
+                bedrooms = post.Property.Bedrooms,
+                bathrooms = post.Property.Bathrooms,
+                address = post.Property.Address
+            }) : null;
+
+            var providerRequest = new AITextRequest
+            {
+                Prompt = BuildFullPrompt(request.Prompt, post),
+                Model = _aiOptions.Model,
+                Temperature = _aiOptions.Temperature,
+                MaxTokens = _aiOptions.MaxTokens,
+                OriginalDataJson = propertyData
+            };
+
+            providerResult = await _aiProvider.GenerateStructuredAsync(providerRequest, CancellationToken.None);
+
+            var output = providerResult.Output;
+            var fullText = "";
+            if (!string.IsNullOrEmpty(output.Title)) fullText += $"**{output.Title}**\n\n";
+            if (!string.IsNullOrEmpty(output.Summary)) fullText += $"{output.Summary}\n\n";
+            if (!string.IsNullOrEmpty(output.Caption)) fullText += $"{output.Caption}\n\n";
+            if (output.Hashtags != null && output.Hashtags.Count > 0)
+                fullText += string.Join(" ", output.Hashtags.Select(h => h.StartsWith("#") ? h : "#" + h)) + "\n\n";
+            if (!string.IsNullOrEmpty(output.CallToAction)) fullText += $"📞 {output.CallToAction}";
+
+            generatedContent = fullText.Trim();
+            promptTokens = providerResult.PromptTokens;
+            completionTokens = providerResult.CompletionTokens;
+            estimatedCost = (promptTokens * 0.000000075m) + (completionTokens * 0.0000003m);
+
+            var trackingObj = new
+            {
+                factsUsed = output.FactsUsed,
+                warnings = output.Warnings
+            };
+            factsUsedJson = JsonSerializer.Serialize(trackingObj);
         }
-        else if (await IsOpencodeAvailableAsync())
+        catch (Exception ex)
         {
-            generatedContent = await CallOpencodeAsync(request.Prompt, post);
-        }
-        else
-        {
-            generatedContent = GenerateMockContent(request.Prompt, post);
+            _logger.LogError(ex, "Gemini generation failed.");
+            throw new BusinessException($"Không thể tạo nội dung bằng AI. Lỗi: {ex.Message}");
         }
 
         var generation = new AIContentGeneration
@@ -80,243 +128,71 @@ public class AIContentService : IAIContentService
             Prompt = request.Prompt,
             GeneratedContent = generatedContent,
             CreatedBy = _currentUser.Email,
+            PromptTokens = promptTokens,
+            CompletionTokens = completionTokens,
+            EstimatedCost = estimatedCost,
+            FactsUsedJson = factsUsedJson
         };
 
         _context.AIContentGenerations.Add(generation);
+
+        // Auto-save the generated content directly to the parent Post entity to prevent null content issues
+        post.Content = generatedContent;
+        if (string.IsNullOrWhiteSpace(post.Summary) || post.Summary.Contains("Kênh:"))
+        {
+            post.Summary = generatedContent.Length > 200 
+                ? generatedContent.Substring(0, 200) + "..." 
+                : generatedContent;
+        }
+
         await _context.SaveChangesAsync();
-        await TryLogGenerationAsync(generation);
 
         return MapToResponse(generation);
     }
 
-    private async Task TryLogGenerationAsync(AIContentGeneration generation)
+    private static string BuildFullPrompt(string prompt, Post post)
     {
-        try
-        {
-            await _activityLogService.LogAsync(
-                "AIContentGeneration",
-                generation.Id,
-                ActivityType.Create,
-                "Generated AI content for post",
-                null,
-                new
-                {
-                    generation.PostId,
-                    promptLength = generation.Prompt.Length,
-                    contentLength = generation.GeneratedContent?.Length ?? 0
-                });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to write activity log for AI content generation {GenerationId}", generation.Id);
-        }
-    }
-
-    // ============================================================
-    //  Gemini API
-    // ============================================================
-
-    private async Task<string> CallGeminiAsync(string prompt, Post post)
-    {
-        var propertyInfo = post.Property != null
-            ? $"\n\nThông tin BĐS: {post.Property.Title} - {post.Property.Description ?? ""}"
+        var propertyInfo = (post != null && post.Property != null)
+            ? $"\n\nThông tin BĐS gốc để đối chiếu: Tiêu đề={post.Property.Title}, Mô tả={post.Property.Description ?? ""}, Giá={post.Property.Price}, Phòng ngủ={post.Property.Bedrooms}, Phòng tắm={post.Property.Bathrooms}, Địa chỉ={post.Property.Address}"
             : "";
 
-        var fullPrompt = $"{prompt}{propertyInfo}\n\nViết bằng tiếng Việt, giọng văn chuyên nghiệp, hấp dẫn.";
-
-        var url = $"https://generativelanguage.googleapis.com/v1beta/models/{_aiOptions.Model}:generateContent?key={_aiOptions.ApiKey}";
-
-        var body = new
+        string fullPrompt;
+        if (prompt.Contains("trích xuất thông tin dưới dạng JSON") || prompt.Contains("JSON phải có định dạng chính xác"))
         {
-            contents = new[]
+            fullPrompt = $"{prompt}{propertyInfo}";
+        }
+        else
+        {
+            fullPrompt = $"{prompt}{propertyInfo}\n\nViết bằng tiếng Việt. Hãy trích xuất và đối chiếu chính xác các dữ kiện (factsUsed) như giá, diện tích, địa chỉ để đối chiếu với thông tin gốc.";
+            fullPrompt = ApplyPlatformTemplateInstructions(fullPrompt);
+        }
+        return fullPrompt;
+    }
+
+    private static string ApplyPlatformTemplateInstructions(string prompt)
+    {
+        if (File.Exists(PlatformConfigPath))
+        {
+            try
             {
-                new
+                var content = File.ReadAllText(PlatformConfigPath);
+                using var doc = JsonDocument.Parse(content);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("usePlatformTemplate", out var useTemplateEl) && useTemplateEl.GetBoolean() &&
+                    root.TryGetProperty("templateContent", out var templateEl))
                 {
-                    parts = new[]
+                    var templateContent = templateEl.GetString();
+                    if (!string.IsNullOrWhiteSpace(templateContent))
                     {
-                        new { text = fullPrompt }
+                        return $"{prompt}\n\n[YÊU CẦU ĐẶC BIỆT - MẪU CẤU TRÚC THƯƠNG HIỆU (PLATFORM TEMPLATE)]:\nHãy viết nội dung đúng và khít theo cấu trúc mẫu sau đây. Đọc mẫu này và tìm các chỗ hợp lý để thay tên đất, tên dự án, thông tin liên hệ, diện tích, giá bán vào. Giữ nguyên cấu trúc định dạng của mẫu:\n\n{templateContent}";
                     }
                 }
-            },
-            generationConfig = new
-            {
-                maxOutputTokens = _aiOptions.MaxTokens,
-                temperature = _aiOptions.Temperature,
             }
-        };
-
-        var response = await _httpClient.PostAsJsonAsync(url, body);
-        response.EnsureSuccessStatusCode();
-
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var text = json
-            .GetProperty("candidates")[0]
-            .GetProperty("content")
-            .GetProperty("parts")[0]
-            .GetProperty("text")
-            .GetString();
-
-        return text ?? "⚠️ Gemini không trả về nội dung.";
+            catch { /* bypass */ }
+        }
+        return prompt;
     }
 
-    // ============================================================
-    //  opencode CLI (local, free, không cần API key)
-    // ============================================================
-
-    /// <summary>Kiểm tra opencode có sẵn trên máy không</summary>
-    private static async Task<bool> IsOpencodeAvailableAsync()
-    {
-        if (_isOpencodeAvailable.HasValue)
-            return _isOpencodeAvailable.Value;
-
-        return await Task.Run(() =>
-        {
-            lock (_lock)
-            {
-                if (_isOpencodeAvailable.HasValue)
-                    return _isOpencodeAvailable.Value;
-
-                try
-                {
-                    var opencodePath = GetOpencodeExecutablePath();
-                    using var proc = new Process
-                    {
-                        StartInfo = new ProcessStartInfo
-                        {
-                            FileName = opencodePath ?? "cmd.exe",
-                            Arguments = opencodePath != null ? "--version" : "/c opencode --version",
-                            RedirectStandardOutput = true,
-                            RedirectStandardError = true,
-                            UseShellExecute = false,
-                            CreateNoWindow = true,
-                        }
-                    };
-                    proc.Start();
-                    proc.WaitForExit(5000);
-                    _isOpencodeAvailable = proc.ExitCode == 0;
-                }
-                catch
-                {
-                    _isOpencodeAvailable = false;
-                }
-                return _isOpencodeAvailable.Value;
-            }
-        });
-    }
-
-    /// <summary>Gọi opencode CLI để sinh nội dung (free, local)</summary>
-    private static async Task<string> CallOpencodeAsync(string prompt, Post post)
-    {
-        var propertyInfo = post.Property != null
-            ? $"\n\nThông tin BĐS: {post.Property.Title}"
-            : "";
-
-        var fullPrompt = $"{prompt}{propertyInfo}\n\nViết bằng tiếng Việt, giọng văn chuyên nghiệp.";
-
-        var opencodePath = GetOpencodeExecutablePath();
-        using var proc = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = opencodePath ?? "cmd.exe",
-                Arguments = opencodePath != null
-                    ? $"run --dangerously-skip-permissions --pure --model opencode/deepseek-v4-flash-free --format json \"{EscapeArg(fullPrompt)}\""
-                    : $"/c opencode run --dangerously-skip-permissions --pure --model opencode/deepseek-v4-flash-free --format json \"{EscapeArg(fullPrompt)}\"",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                WorkingDirectory = ProjectRoot,
-            }
-        };
-
-        var outputBuilder = new System.Text.StringBuilder();
-        var errorBuilder = new System.Text.StringBuilder();
-
-        proc.Start();
-
-        // Đọc NDJSON từ stdout
-        var outputTask = Task.Run(async () =>
-        {
-            using var reader = proc.StandardOutput;
-            string? line;
-            while ((line = await reader.ReadLineAsync()) != null)
-            {
-                if (string.IsNullOrWhiteSpace(line)) continue;
-                try
-                {
-                    using var doc = JsonDocument.Parse(line);
-                    var root = doc.RootElement;
-                    if (root.TryGetProperty("type", out var typeEl) && typeEl.GetString() == "text")
-                    {
-                        var text = root.GetProperty("part").GetProperty("text").GetString();
-                        if (!string.IsNullOrEmpty(text))
-                            outputBuilder.Append(text);
-                    }
-                }
-                catch { /* skip dòng không parse được */ }
-            }
-        });
-
-        var errorTask = proc.StandardError.ReadToEndAsync();
-
-        // Timeout 60s
-        var exited = proc.WaitForExit(60_000);
-        if (!exited)
-        {
-            proc.Kill();
-            throw new TimeoutException("opencode không phản hồi trong 60s.");
-        }
-
-        await outputTask;
-        var result = outputBuilder.ToString().Trim();
-
-        if (string.IsNullOrEmpty(result))
-        {
-            var err = await errorTask;
-            throw new Exception($"opencode không trả về nội dung. Lỗi: {err}");
-        }
-
-        return result;
-    }
-
-    private static string EscapeArg(string arg)
-        => arg.Replace("\\", "\\\\").Replace("\"", "\\\"");
-
-    private static string? GetOpencodeExecutablePath()
-    {
-        var pathEnv = Environment.GetEnvironmentVariable("PATH");
-        if (!string.IsNullOrEmpty(pathEnv))
-        {
-            var paths = pathEnv.Split(Path.PathSeparator);
-            foreach (var path in paths)
-            {
-                var cmdPath = Path.Combine(path, "opencode.cmd");
-                if (File.Exists(cmdPath))
-                    return cmdPath;
-
-                var batPath = Path.Combine(path, "opencode.bat");
-                if (File.Exists(batPath))
-                    return batPath;
-
-                var exePath = Path.Combine(path, "opencode.exe");
-                if (File.Exists(exePath))
-                    return exePath;
-            }
-        }
-
-        var appData = Environment.GetEnvironmentVariable("APPDATA");
-        if (!string.IsNullOrEmpty(appData))
-        {
-            var npmPath = Path.Combine(appData, "npm", "opencode.cmd");
-            if (File.Exists(npmPath))
-                return npmPath;
-        }
-
-        return null;
-    }
-
-    /// <summary>Tự động tìm thư mục gốc dự án (nơi có opencode.json)</summary>
     private static string FindProjectRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
@@ -358,22 +234,6 @@ public class AIContentService : IAIContentService
         return MapToResponse(generation);
     }
 
-    /// <summary>
-    /// Tạo nội dung mẫu — sẽ thay bằng AI module thực.
-    /// </summary>
-    private static string GenerateMockContent(string prompt, Post post)
-    {
-        var propertyInfo = post.Property != null
-            ? $"\n\nThông tin BĐS: {post.Property.Title}"
-            : "";
-
-        return $"[AI Generated Content]\n\n"
-            + $"Bài đăng: {post.Title}\n"
-            + $"Prompt: {prompt}{propertyInfo}\n\n"
-            + "Nội dung được tạo bởi AI Content Engine. "
-            + "Vui lòng chỉnh sửa trước khi đăng.";
-    }
-
     private static AIContentGenerationResponse MapToResponse(AIContentGeneration generation)
     {
         return new AIContentGenerationResponse
@@ -383,6 +243,74 @@ public class AIContentService : IAIContentService
             Prompt = generation.Prompt,
             GeneratedContent = generation.GeneratedContent,
             CreatedAt = generation.CreatedAt,
+            PromptTokens = generation.PromptTokens,
+            CompletionTokens = generation.CompletionTokens,
+            EstimatedCost = generation.EstimatedCost,
+            FactsUsedJson = generation.FactsUsedJson
         };
+    }
+
+    public async Task ApplyAsync(Guid postId, ApplyAIContentRequest request)
+    {
+        var post = await _context.Posts
+            .FirstOrDefaultAsync(p => p.Id == postId)
+            ?? throw new NotFoundException("Post", postId);
+
+        if (string.IsNullOrWhiteSpace(request.Content))
+            throw new BusinessException("Nội dung bài viết không được rỗng khi áp dụng.");
+
+        post.Content = request.Content;
+        if (!string.IsNullOrEmpty(request.Summary))
+        {
+            post.Summary = request.Summary;
+        }
+        else if (request.Content.Length > 200)
+        {
+            post.Summary = request.Content.Substring(0, 200) + "...";
+        }
+        else
+        {
+            post.Summary = request.Content;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<string> ChatAsync(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            throw new BusinessException("Tin nhắn không được để trống.");
+
+        string fullPrompt;
+        var msgLower = message.ToLower();
+        if (msgLower.Contains("intent") && msgLower.Contains("budget") && msgLower.Contains("bedrooms"))
+        {
+            fullPrompt = message;
+        }
+        else
+        {
+            var systemInstructions = "Bạn là RealSync AI Copilot, trợ lý AI thông minh chuyên nghiệp tích hợp trong hệ thống CRM Bất động sản RealSync. "
+                + "Nhiệm vụ của bạn là hỗ trợ người dùng về chấm điểm lead, soạn tin đăng BĐS, phân tích thị trường hoặc gợi ý chăm sóc khách hàng. "
+                + "Hãy trả lời bằng tiếng Việt, súc tích, chuyên nghiệp và hữu ích.";
+
+            fullPrompt = $"{systemInstructions}\n\nNgười dùng hỏi: {message}\n\nTrả lời:";
+        }
+
+        if (!_aiOptions.IsConfigured || string.IsNullOrWhiteSpace(_aiOptions.ApiKey))
+        {
+            throw new BusinessException("Gemini API Key chưa được cấu hình. Vui lòng thiết lập trong Cài đặt hệ thống.");
+        }
+
+
+
+        try
+        {
+            return await _aiProvider.GenerateTextAsync(fullPrompt, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Chat via Gemini failed.");
+            throw new BusinessException($"Lỗi kết nối AI: {ex.Message}");
+        }
     }
 }

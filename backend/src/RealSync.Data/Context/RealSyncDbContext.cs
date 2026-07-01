@@ -66,6 +66,21 @@ public class RealSyncDbContext : DbContext
     public DbSet<PostSchedule> PostSchedules => Set<PostSchedule>();
     public DbSet<AIContentGeneration> AIContentGenerations => Set<AIContentGeneration>();
 
+    // Files
+    public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
+
+    // Publishing and Credentials Infrastructure
+    public DbSet<ConnectedAccount> ConnectedAccounts => Set<ConnectedAccount>();
+    public DbSet<OAuthCredential> OAuthCredentials => Set<OAuthCredential>();
+    public DbSet<ContentVariant> ContentVariants => Set<ContentVariant>();
+    public DbSet<PublicationJob> PublicationJobs => Set<PublicationJob>();
+    public DbSet<PublicationAttempt> PublicationAttempts => Set<PublicationAttempt>();
+    public DbSet<ProviderCredential> ProviderCredentials => Set<ProviderCredential>();
+    public DbSet<ProviderUsageDaily> ProviderUsageDailies => Set<ProviderUsageDaily>();
+    public DbSet<VideoProject> VideoProjects => Set<VideoProject>();
+    public DbSet<VideoScene> VideoScenes => Set<VideoScene>();
+    public DbSet<VideoGenerationJob> VideoGenerationJobs => Set<VideoGenerationJob>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -76,7 +91,9 @@ public class RealSyncDbContext : DbContext
         // Global query filter: tự động loại bỏ soft-deleted entities
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
-            if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
+            if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType) && 
+                entityType.ClrType != typeof(Permission) && 
+                entityType.ClrType != typeof(Role))
             {
                 var parameter = System.Linq.Expressions.Expression.Parameter(entityType.ClrType, "e");
                 var property = System.Linq.Expressions.Expression.Property(parameter, nameof(BaseEntity.IsDeleted));

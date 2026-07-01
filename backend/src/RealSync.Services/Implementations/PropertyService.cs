@@ -215,24 +215,20 @@ public class PropertyService : IPropertyService
         {
             foreach (var file in files)
             {
-                ValidateImage(file);
-
-                var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-                var fileName = $"{Guid.NewGuid():N}{extension}";
-                var storageKey = $"properties/{propertyId}/{fileName}";
+                using var stream = file.OpenReadStream();
                 var isThumbnail = !hasThumbnail && images.Count == 0;
-                var uploadResult = await _fileStorageService.UploadAsync(storageKey, file);
-                uploadedKeys.Add(uploadResult.Key);
+                var uploadResult = await _fileStorageService.SavePublicImageAsync(stream, file.FileName, file.ContentType, "properties");
+                uploadedKeys.Add(uploadResult.RelativePath);
 
                 images.Add(new PropertyImage
                 {
                     PropertyId = propertyId,
-                    FileName = fileName,
-                    OriginalFileName = Path.GetFileName(file.FileName),
-                    FilePath = uploadResult.Key,
+                    FileName = uploadResult.StoredFileName,
+                    OriginalFileName = uploadResult.OriginalFileName,
+                    FilePath = uploadResult.RelativePath,
                     Url = uploadResult.Url,
-                    ContentType = file.ContentType,
-                    Size = file.Length,
+                    ContentType = uploadResult.ContentType,
+                    Size = uploadResult.SizeBytes,
                     IsThumbnail = isThumbnail,
                     IsPrimary = isThumbnail,
                     SortOrder = nextSortOrder++

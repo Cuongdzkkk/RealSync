@@ -2,6 +2,7 @@ import { ref } from 'vue';
 import { defineStore } from 'pinia';
 import type { Property } from '@/types/property';
 import { mockProperties } from '@/utils/mockData';
+import { propertyService } from '@/services/propertyService';
 
 export const usePropertyStore = defineStore('property', () => {
   const items = ref<Property[]>(mockProperties);
@@ -9,6 +10,18 @@ export const usePropertyStore = defineStore('property', () => {
 
   const setItems = (properties: Property[]) => {
     items.value = properties;
+  };
+
+  const fetchProperties = async () => {
+    loading.value = true;
+    try {
+      const res = await propertyService.getProperties({ page: 1, pageSize: 100 });
+      items.value = res.data ?? [];
+    } catch (err) {
+      console.error('Failed to fetch properties:', err);
+    } finally {
+      loading.value = false;
+    }
   };
 
   const addProperty = (property: Property) => {
@@ -30,6 +43,7 @@ export const usePropertyStore = defineStore('property', () => {
     items,
     loading,
     setItems,
+    fetchProperties,
     addProperty,
     updateProperty,
     deleteProperty

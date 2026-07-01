@@ -1,5 +1,7 @@
 using System.Text;
 using FluentValidation;
+using Hangfire;
+using Hangfire.SqlServer;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -7,9 +9,13 @@ using RealSync.Api.Filters;
 using RealSync.Api.HostedServices;
 using RealSync.Api.Services;
 using RealSync.Core.Interfaces;
+using RealSync.Core.Interfaces.Publishing;
 using RealSync.Data.Repositories;
 using RealSync.Services.Implementations;
 using RealSync.Services.Options;
+using RealSync.Services.Publishing;
+using RealSync.Core.Interfaces.Media;
+using RealSync.Services.Media;
 
 namespace RealSync.Api.Extensions;
 
@@ -35,7 +41,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICustomerRepository, CustomerRepository>();
 
         // Services
-        services.AddScoped<IFileStorageService, R2FileStorageService>();
+        services.AddScoped<IFileStorageService, LocalFileStorageService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IActivityLogService, ActivityLogService>();
         services.AddScoped<INotificationService, NotificationService>();
@@ -45,6 +51,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPropertyService, PropertyService>();
         services.AddScoped<ILeadService, LeadService>();
         services.AddScoped<ICustomerService, CustomerService>();
+        services.AddScoped<ICrawlerService, CrawlerService>();
+        services.AddScoped<IPublicationService, PublicationService>();
 
         // Posting services
         services.AddScoped<IPostService, PostService>();
@@ -54,6 +62,85 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(new HttpClient()); // built-in, không cần cài gói
         services.AddScoped<IAIContentService, AIContentService>();
 
+        // Publishing services
+        services.AddScoped<IConnectedAccountService, ConnectedAccountService>();
+        services.AddScoped<IConnectorResolver, ConnectorResolver>();
+        services.AddScoped<ICredentialVault, LocalCredentialVault>();
+        services.AddScoped<IPublicationOrchestrator, PublicationOrchestrator>();
+
+        // Video and Storage Services
+        services.AddScoped<IVideoProjectService, VideoProjectService>();
+        services.AddScoped<IVideoRenderService, FfmpegVideoRenderService>();
+        services.AddHttpClient<IVideoGenerationProvider, VeoVideoProvider>(client =>
+        {
+            client.Timeout = TimeSpan.FromMinutes(5);
+        });
+        services.AddHttpClient<IAITextProvider, GeminiAIProvider>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+
+        // Publishing Engine (Connectors)
+        services.AddScoped<IPublishingConnector, WebsiteConnector>();
+        services.AddScoped<IPublishingConnector, PortalConnector>();
+
+        services.AddScoped<FacebookGroupConnector>();
+        services.AddScoped<IPublishingConnector, FacebookGroupConnector>(sp => sp.GetRequiredService<FacebookGroupConnector>());
+
+        services.AddHttpClient<InstagramProfessionalConnector>(client =>
+        {
+            client.BaseAddress = new Uri("https://graph.facebook.com/v25.0/");
+            client.Timeout = TimeSpan.FromMinutes(2);
+        });
+        services.AddScoped<IPublishingConnector, InstagramProfessionalConnector>(sp =>
+            sp.GetRequiredService<InstagramProfessionalConnector>());
+
+        services.AddHttpClient<MetaPageConnector>(client =>
+        {
+            client.BaseAddress = new Uri("https://graph.facebook.com/v25.0/");
+            client.Timeout = TimeSpan.FromMinutes(2);
+        });
+        services.AddScoped<IPublishingConnector, MetaPageConnector>(sp =>
+            sp.GetRequiredService<MetaPageConnector>());
+
+        services.AddHttpClient<TikTokConnector>(client =>
+        {
+            client.BaseAddress = new Uri("https://open.tiktokapis.com/");
+            client.Timeout = TimeSpan.FromMinutes(2);
+        });
+        services.AddScoped<IPublishingConnector, TikTokConnector>(sp =>
+            sp.GetRequiredService<TikTokConnector>());
+
+        services.AddHttpClient<YouTubeConnector>(client =>
+        {
+            client.Timeout = TimeSpan.FromMinutes(10);
+        });
+        services.AddScoped<IPublishingConnector, YouTubeConnector>(sp =>
+            sp.GetRequiredService<YouTubeConnector>());
+
+        services.AddHttpClient<ZaloOAConnector>(client =>
+        {
+            client.BaseAddress = new Uri("https://openapi.zalo.me/");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+        services.AddScoped<IPublishingConnector, ZaloOAConnector>(sp =>
+            sp.GetRequiredService<ZaloOAConnector>());
+
+        // Token & OAuth services
+        services.AddHttpClient<TikTokOAuthService>(client =>
+        {
+            client.BaseAddress = new Uri("https://open.tiktokapis.com/");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+        services.AddScoped<TikTokOAuthService>(sp => sp.GetRequiredService<TikTokOAuthService>());
+        services.AddScoped<TikTokTokenRefreshService>();
+        services.AddScoped<ZaloTokenRefreshService>();
+
+        // Cache services
+        services.AddMemoryCache();
+
+        // File storage
+        services.AddScoped<R2FileStorageService>();
 
         // FluentValidation — auto-scan tất cả validators từ Shared assembly
         services.AddValidatorsFromAssemblyContaining<RealSync.Shared.Validators.Auth.LoginRequestValidator>();
@@ -70,6 +157,11 @@ public static class ServiceCollectionExtensions
         return services.AddControllers(options =>
         {
             options.Filters.Add<ValidationFilter>();
+        })
+        .AddJsonOptions(json =>
+        {
+            json.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+            json.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
         });
     }
 
@@ -166,6 +258,8 @@ public static class ServiceCollectionExtensions
                 policy
                     .WithOrigins(
                         "http://localhost:5173",  // Vite dev
+                        "http://localhost:5174",  // Vite dev fallback 1
+                        "http://localhost:5175",  // Vite dev fallback 2
                         "http://localhost:3000",  // Docker frontend
                         "https://realsync.vn")    // Production
                     .AllowAnyHeader()
@@ -173,6 +267,30 @@ public static class ServiceCollectionExtensions
                     .AllowCredentials();
             });
         });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Cß║Ñu h├¼nh Hangfire vß╗¢i SqlServer storage.
+    /// </summary>
+    public static IServiceCollection AddHangfireServices(
+        this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddHangfire(config => config
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UseSqlServerStorage(configuration.GetConnectionString("DefaultConnection"), new SqlServerStorageOptions
+            {
+                CommandBatchMaxTimeout = TimeSpan.FromMinutes(5),
+                SlidingInvisibilityTimeout = TimeSpan.FromMinutes(5),
+                QueuePollInterval = TimeSpan.FromSeconds(15),
+                UseRecommendedIsolationLevel = true,
+                DisableGlobalLocks = true
+            }));
+
+        services.AddHangfireServer();
 
         return services;
     }
