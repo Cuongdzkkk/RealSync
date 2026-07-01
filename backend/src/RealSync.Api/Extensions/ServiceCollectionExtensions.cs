@@ -132,7 +132,6 @@ public static class ServiceCollectionExtensions
             client.BaseAddress = new Uri("https://open.tiktokapis.com/");
             client.Timeout = TimeSpan.FromSeconds(30);
         });
-        services.AddScoped<TikTokOAuthService>(sp => sp.GetRequiredService<TikTokOAuthService>());
         services.AddScoped<TikTokTokenRefreshService>();
         services.AddScoped<ZaloTokenRefreshService>();
 
@@ -162,6 +161,7 @@ public static class ServiceCollectionExtensions
         {
             json.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
             json.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+            json.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
         });
     }
 
